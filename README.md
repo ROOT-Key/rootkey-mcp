@@ -11,6 +11,14 @@ It is a thin translation layer. Every tool call is a real API request made with 
 
 ## Install
 
+### Let your agent do it
+
+Hand any coding agent the published setup instructions and it configures itself, whichever client it runs in:
+
+```
+https://docs.rootkey.ai/agent-setup/prompt.md
+```
+
 ### Claude Code
 
 ```bash
