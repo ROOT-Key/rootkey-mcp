@@ -97,6 +97,19 @@ Read tools carry `readOnlyHint` and the four delete tools carry `destructiveHint
 
 The twelve tools whose payload this server shapes -- every listing, both downloads, the wait helper and the diagnostic -- publish an `outputSchema` and return `structuredContent`, so a client can validate the result instead of parsing prose. The other fifteen hand back the API response untouched and deliberately declare no schema.
 
+## Prompts
+
+Four workflows, offered as MCP prompts so your client can list them instead of you having to remember the sequence:
+
+| Prompt | What it does |
+| --- | --- |
+| `anchor_folder` | Anchors every file in a local folder into a vault, confirming first and reporting what landed. |
+| `compliance_evidence_pack` | Gathers the anchor, activity history, validations and version chain for one file, and writes it up -- including what the evidence does *not* prove. |
+| `verify_local_copies` | Validates local files against their anchors and leads with the failures. |
+| `backup_workspace` | Creates a recovery point, waits for it, downloads it, and handles the one-time password carefully. |
+
+In read-only mode only `compliance_evidence_pack` is offered, since the other three write.
+
 ## Things worth knowing
 
 - **Vault addresses come from the dashboard.** The ROOTKey API has no endpoint that lists vaults, so this server cannot offer one. `create_vault` returns the address of what it creates; keep it.

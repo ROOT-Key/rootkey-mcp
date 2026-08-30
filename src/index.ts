@@ -8,12 +8,12 @@ async function main(): Promise<void> {
   const config = loadConfig();
   setLogLevel(config.logLevel);
 
-  const { server, toolNames } = buildServer(config);
+  const { server, toolNames, promptNames } = buildServer(config);
 
   await server.connect(new StdioServerTransport());
 
   log.info(
-    `rootkey-mcp ${SERVER_VERSION} ready on stdio - ${toolNames.length} tools, ` +
+    `rootkey-mcp ${SERVER_VERSION} ready on stdio - ${toolNames.length} tools, ${promptNames.length} prompts, ` +
       `${config.environment} API at ${config.baseUrl}${config.readOnly ? ', read-only mode' : ''}`,
   );
 }

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Config } from './config.js';
 import { RootKeyClient } from './http.js';
+import { registerPrompts } from './prompts.js';
 import { SERVER_NAME, SERVER_VERSION } from './version.js';
 import { environmentTools } from './tools/environment.js';
 import { fileTools } from './tools/files.js';
@@ -75,6 +76,7 @@ export const SERVER_INSTRUCTIONS = [
 export interface BuiltServer {
   server: McpServer;
   toolNames: string[];
+  promptNames: string[];
 }
 
 export function buildServer(config: Config): BuiltServer {
@@ -96,5 +98,7 @@ export function buildServer(config: Config): BuiltServer {
     ]),
   );
 
-  return { server, toolNames };
+  const promptNames = registerPrompts(server, config);
+
+  return { server, toolNames, promptNames };
 }
