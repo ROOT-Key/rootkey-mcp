@@ -114,6 +114,12 @@ describe('tool registration', () => {
       expect(byName.get('get_environment_info')?.annotations?.openWorldHint).toBe(false);
       expect(byName.get('list_files')?.annotations?.openWorldHint).toBe(true);
 
+      // A download changes nothing in the workspace, so it survives read-only mode - but it does write
+      // a file, so it cannot claim readOnlyHint. The two questions are separate and answered separately.
+      expect(byName.get('download_file')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('download_recovery_point')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('get_file')?.annotations?.readOnlyHint).toBe(true);
+
       for (const tool of tools) {
         expect(tool.description, `${tool.name} needs a description`).toBeTruthy();
         expect(tool.annotations?.title, `${tool.name} needs a title`).toBeTruthy();
@@ -121,6 +127,53 @@ describe('tool registration', () => {
     } finally {
       await close();
     }
+  });
+});
+
+describe('read-only mode', () => {
+  it('still serves the downloads, because they change nothing in the workspace', async () => {
+    const { client, close } = await connectTestClient(testConfig({ readOnly: true }));
+    try {
+      const names = (await client.listTools()).tools.map((tool) => tool.name);
+      expect(names).toContain('download_file');
+      expect(names).toContain('download_recovery_point');
+      expect(names).not.toContain('upload_file');
+    } finally {
+      await close();
+    }
+  });
+
+  it('refuses a download aimed outside the download directory', async () => {
+    const downloadDir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+    const elsewhere = await mkdtemp(path.join(tmpdir(), 'rootkey-elsewhere-'));
+
+    await withClient(
+      [{ text: 'file-bytes' }],
+      async (call) => {
+        const result = await call('download_file', {
+          fileId: 'f1',
+          outputPath: path.join(elsewhere, 'exfiltrated.bin'),
+        });
+
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('read-only mode');
+      },
+      testConfig({ readOnly: true, downloadDir }),
+    );
+  });
+
+  it('still saves a download that lands inside the download directory', async () => {
+    const downloadDir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+
+    await withClient(
+      [{ text: 'file-bytes' }],
+      async (call) => {
+        const result = await call('download_file', { fileId: 'f1' });
+        expect(result.isError).toBeFalsy();
+        expect((payloadOf(result) as { savedPath: string }).savedPath).toContain(downloadDir);
+      },
+      testConfig({ readOnly: true, downloadDir }),
+    );
   });
 });
 

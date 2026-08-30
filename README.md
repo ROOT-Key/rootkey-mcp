@@ -70,7 +70,7 @@ Commit a `.mcp.json` at the root of your repository and let each person supply t
 | `ROOTKEY_API_KEY` | required | Your ROOTKey API key. The server exits immediately if it is missing. |
 | `ROOTKEY_ENV` | `production` | `production` or `development`. Picks the matching API base URL. |
 | `ROOTKEY_API_URL` | - | Full base URL, including the `/api-v1/` path. Overrides `ROOTKEY_ENV`. |
-| `ROOTKEY_READ_ONLY` | `false` | When true, only the 14 read tools are registered. |
+| `ROOTKEY_READ_ONLY` | `false` | When true, only the 14 read tools are registered, and downloads may only write inside `ROOTKEY_DOWNLOAD_DIR`. |
 | `ROOTKEY_TIMEOUT_MS` | `30000` | Timeout for ordinary requests. |
 | `ROOTKEY_TRANSFER_TIMEOUT_MS` | `300000` | Timeout for uploads and downloads. |
 | `ROOTKEY_DOWNLOAD_DIR` | `~/Downloads` | Where downloads land when no path is given. |
@@ -93,7 +93,7 @@ Use an `rk_test_` key with `ROOTKEY_ENV=development` while you are trying things
 
 **Diagnostics** - `get_environment_info` (reports the configured environment, key type and tool count; makes no API call and never reveals the key)
 
-Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHint`, so clients can gate them.
+Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHint`, so clients can gate them. The two download tools are the exception: they change nothing in your ROOTKey workspace, so they run in read-only mode, but they do write a file to your disk, so they do not claim `readOnlyHint`.
 
 ## Things worth knowing
 
@@ -105,7 +105,7 @@ Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHin
 - **Records are versioned by primary key.** Creating a record whose key matches an existing one adds a version rather than a duplicate, so retrying a create is not a no-op.
 - **The recovery point password is shown once.** `create_recovery_point` surfaces it prominently and it is never written to the logs; without it the archive cannot be decrypted.
 - **Audit reports are queued, not returned.** The API accepts the job and delivers the finished report in the dashboard; there is no endpoint to fetch it.
-- **Read-only mode is a convenience rail, not a security boundary.** ROOTKey API keys have no scopes and carry the full privileges of the account that owns them. Anything holding the key can do anything the account can, whatever this server registers.
+- **Read-only mode is a convenience rail, not a security boundary.** ROOTKey API keys have no scopes and carry the full privileges of the account that owns them. Anything holding the key can do anything the account can, whatever this server registers. What the mode *does* guarantee is local: no tool it registers changes your workspace, and the two that write to disk are pinned to the download directory.
 
 ## Development
 

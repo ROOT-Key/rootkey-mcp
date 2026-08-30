@@ -6,6 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { Config } from '../config.js';
 import { ApiError, NetworkError, ToolInputError } from '../errors.js';
+import { resolveDownloadDirectory } from '../download.js';
 import { assertReadableFile } from '../paths.js';
 import type { RootKeyClient } from '../http.js';
 import { log } from '../log.js';
@@ -30,8 +31,15 @@ export interface ToolDefinition {
   title: string;
   description: string;
   inputSchema: z.ZodRawShape;
-  /** Registered when the server runs in read-only mode. */
+  /** Registered when the server runs in read-only mode: the tool changes nothing in the workspace. */
   readOnly?: boolean;
+  /**
+   * Reads nothing from the workspace but writes a file to the local disk. Kept apart from `readOnly`
+   * because the two answer different questions: whether the tool may run in read-only mode, and
+   * whether `readOnlyHint` may claim it modifies nothing. A download is yes to the first, no to the
+   * second.
+   */
+  writesLocalFiles?: boolean;
   destructive?: boolean;
   idempotent?: boolean;
   /** Local-only tools do not talk to the API. */
@@ -56,7 +64,7 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
         inputSchema: z.object(definition.inputSchema).strict(),
         annotations: {
           title: definition.title,
-          readOnlyHint: definition.readOnly === true,
+          readOnlyHint: definition.readOnly === true && definition.writesLocalFiles !== true,
           destructiveHint: definition.destructive === true,
           idempotentHint: definition.idempotent === true,
           openWorldHint: definition.local !== true,
@@ -150,6 +158,16 @@ export function optionalString(args: Record<string, unknown>, key: string): stri
   const value = args[key];
   if (typeof value !== 'string' || value.trim() === '') return undefined;
   return value.trim();
+}
+
+/**
+ * Read-only mode promises the server changes nothing. It cannot promise that about the API and the
+ * disk at once unless downloads are pinned somewhere predictable, so in that mode a caller-supplied
+ * outputPath may not leave the download directory. Outside it, undefined: no confinement.
+ */
+export async function readOnlyWriteRoot(ctx: ToolContext): Promise<string | undefined> {
+  if (!ctx.config.readOnly) return undefined;
+  return resolveDownloadDirectory(ctx.config.downloadDir);
 }
 
 /* ------------------------------------------------------------------ *

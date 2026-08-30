@@ -9,6 +9,7 @@ import {
   optionalString,
   pagedQuery,
   paginationArgs,
+  readOnlyWriteRoot,
   requireString,
   statusFilter,
   vaultAddressArg,
@@ -169,8 +170,10 @@ export const fileTools: ToolDefinition[] = [
     title: 'Download a file',
     description:
       'Download a file to the local disk of the machine running this server and return the saved path. ' +
-      'File contents are never inlined into the conversation. An existing file is never overwritten.',
+      'File contents are never inlined into the conversation. An existing file is never overwritten. ' +
+      'In read-only mode the file must land in the configured download directory.',
     readOnly: true,
+    writesLocalFiles: true,
     inputSchema: {
       fileId: fileIdArg,
       outputPath: z
@@ -190,6 +193,7 @@ export const fileTools: ToolDefinition[] = [
         outputPath: optionalString(args, 'outputPath'),
         downloadDir: ctx.config.downloadDir,
         fallbackName: `rootkey-file-${fileId}`,
+        confineTo: await readOnlyWriteRoot(ctx),
       });
 
       return { data: saved };

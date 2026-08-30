@@ -7,6 +7,7 @@ import type { RecoveryPoint } from '../types.js';
 import {
   isoDateTime,
   optionalString,
+  readOnlyWriteRoot,
   requireString,
   type ToolContext,
   type ToolDefinition,
@@ -134,8 +135,10 @@ export const recoveryTools: ToolDefinition[] = [
     description:
       'Download the encrypted archive to the local disk of the machine running this server. Only works once ' +
       'the recovery point reports status "completed". The archive can only be opened with the one-time ' +
-      'password issued when it was created.',
+      'password issued when it was created. In read-only mode it must land in the configured download ' +
+      'directory.',
     readOnly: true,
+    writesLocalFiles: true,
     inputSchema: {
       recoveryPointId: recoveryPointIdArg,
       outputPath: z
@@ -155,6 +158,7 @@ export const recoveryTools: ToolDefinition[] = [
         outputPath: optionalString(args, 'outputPath'),
         downloadDir: ctx.config.downloadDir,
         fallbackName: `rootkey-recovery-point-${id}.zip`,
+        confineTo: await readOnlyWriteRoot(ctx),
       });
 
       return {

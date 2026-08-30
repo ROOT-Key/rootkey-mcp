@@ -53,6 +53,22 @@ async function canonical(candidate: string): Promise<string> {
   }
 }
 
+/** Containment for a path that does not exist yet: resolve the deepest existing ancestor. */
+export async function assertWithinDirectory(target: string, directory: string, what: string): Promise<string> {
+  const resolvedTarget = path.resolve(target);
+  const root = await canonical(directory);
+  const parent = await canonical(path.dirname(resolvedTarget));
+  const candidate = path.join(parent, path.basename(resolvedTarget));
+
+  if (!isInside(candidate, root)) {
+    throw new ToolInputError(
+      `Refusing to write ${what} to "${resolvedTarget}": in read-only mode this server may only write ` +
+        `inside ${root}. Drop outputPath to use the default location, or restart without ROOTKEY_READ_ONLY.`,
+    );
+  }
+  return candidate;
+}
+
 /**
  * Throws a ToolInputError naming the roots when `filePath` is out of bounds. The message is written
  * for the model: it says which rule was broken and which variable widens it.
