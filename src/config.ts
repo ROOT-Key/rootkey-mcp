@@ -16,7 +16,7 @@ export interface Config {
   timeoutMs: number;
   transferTimeoutMs: number;
   downloadDir: string | undefined;
-  /** Absolute roots that upload_file, upload_file_version and validate_file may read from. */
+  /** Absolute roots that rootkey_upload_file, rootkey_upload_file_version and rootkey_validate_file may read from. */
   allowedRoots: string[];
   logLevel: LogLevel;
 }

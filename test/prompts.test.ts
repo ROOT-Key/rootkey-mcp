@@ -46,7 +46,7 @@ describe('prompts', () => {
       const text = first?.content.type === 'text' ? first.content.text : '';
       expect(text).toContain('/tmp/contracts');
       expect(text).toContain('0xdf67');
-      expect(text).toContain('upload_file');
+      expect(text).toContain('rootkey_upload_file');
     } finally {
       await close();
     }
@@ -59,7 +59,7 @@ describe('prompts', () => {
       const first = result.messages[0];
       const text = first?.content.type === 'text' ? first.content.text : '';
 
-      expect(text).toContain('wait_for_recovery_point');
+      expect(text).toContain('rootkey_wait_for_recovery_point');
       expect(text).toContain('shown once');
       expect(text).toContain('Do not repeat the password');
     } finally {

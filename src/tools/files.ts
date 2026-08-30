@@ -19,7 +19,7 @@ import {
   type ToolDefinition,
 } from './shared.js';
 
-const fileIdArg = z.string().min(1).describe('File id, as returned by list_files.');
+const fileIdArg = z.string().min(1).describe('File id, as returned by rootkey_list_files.');
 
 /** send -> resolve id -> done. Coarse on purpose; see the note at the upload call site. */
 const UPLOAD_PHASES = 2;
@@ -36,7 +36,7 @@ function sizeMatches(item: FileSummary, sizeBytes: number): boolean {
  * afterwards. The lookup is best effort: never let it turn a successful upload into a failed tool call.
  *
  * The API's `name` filter is a case-insensitive `contains`, so a row coming back is not evidence that
- * it is the row we just wrote. The identity we return flows straight into get_file and delete_file, so
+ * it is the row we just wrote. The identity we return flows straight into rootkey_get_file and rootkey_delete_file, so
  * a near-miss is worse than no answer: match the exact name AND the exact byte count, newest first,
  * and return null rather than a plausible-looking neighbour.
  */
@@ -65,7 +65,7 @@ async function findUploadedFile(
 
 export const fileTools: ToolDefinition[] = [
   {
-    name: 'list_files',
+    name: 'rootkey_list_files',
     title: 'List files',
     description:
       'List files in a vault, newest first. Supports filtering by name, creation window and anchoring status, ' +
@@ -99,7 +99,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'upload_file',
+    name: 'rootkey_upload_file',
     title: 'Upload and anchor a file',
     description:
       'Upload a file from the local machine running this server into a vault and anchor it. Anchoring is ' +
@@ -149,14 +149,14 @@ export const fileTools: ToolDefinition[] = [
         notice: file
           ? undefined
           : 'The upload succeeded. The follow-up lookup could not yet identify the new file with certainty, ' +
-            'so no id is reported rather than a guess - call list_files on this vault in a moment to get it.',
+            'so no id is reported rather than a guess - call rootkey_list_files on this vault in a moment to get it.',
         data: { ...receipt, fileName, sizeBytes, file },
       };
     },
   },
 
   {
-    name: 'get_file',
+    name: 'rootkey_get_file',
     title: 'Get file details',
     description:
       'Fetch one file with its full detail: hashes, transaction hash, contract address, expiration and ' +
@@ -178,7 +178,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'download_file',
+    name: 'rootkey_download_file',
     title: 'Download a file',
     description:
       'Download a file to the local disk of the machine running this server and return the saved path. ' +
@@ -218,10 +218,10 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'delete_file',
+    name: 'rootkey_delete_file',
     title: 'Delete a file',
     description:
-      'Delete a file. It moves to the trash: it stops appearing in list_files immediately, and stays ' +
+      'Delete a file. It moves to the trash: it stops appearing in rootkey_list_files immediately, and stays ' +
       'recoverable from the Restore Center in the ROOTKey dashboard until the retention policy purges it ' +
       'for good. Confirm with the user first. The on-chain anchor is untouched either way - a proof that ' +
       'was written stays valid forever.',
@@ -243,7 +243,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'list_file_versions',
+    name: 'rootkey_list_file_versions',
     title: 'List file versions',
     description: 'List every version of a file, newest first.',
     readOnly: true,
@@ -265,7 +265,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'upload_file_version',
+    name: 'rootkey_upload_file_version',
     title: 'Upload a new file version',
     description:
       'Upload a new version of an existing file from local disk and anchor it. The previous version stays ' +
@@ -308,14 +308,14 @@ export const fileTools: ToolDefinition[] = [
         notice: version
           ? undefined
           : 'The version was uploaded. The follow-up lookup could not yet identify it with certainty, so no ' +
-            'id is reported rather than a guess - call list_file_versions shortly to get it.',
+            'id is reported rather than a guess - call rootkey_list_file_versions shortly to get it.',
         data: { ...receipt, fileName, sizeBytes, version },
       };
     },
   },
 
   {
-    name: 'validate_file',
+    name: 'rootkey_validate_file',
     title: 'Validate a file against its anchor',
     description:
       'Check a local copy of a file against what was anchored, by comparing SHA-256 hashes. Returns ' +
@@ -349,7 +349,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'get_file_history',
+    name: 'rootkey_get_file_history',
     title: 'Get file activity history',
     description:
       'Read the activity log for a file: who did what and when, including which API key acted. This is the ' +
@@ -372,7 +372,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'get_file_validations',
+    name: 'rootkey_get_file_validations',
     title: 'Get file validation history',
     description: 'List past integrity validations of a file, with the current and previous hashes.',
     readOnly: true,
@@ -393,7 +393,7 @@ export const fileTools: ToolDefinition[] = [
   },
 
   {
-    name: 'generate_file_audit_report',
+    name: 'rootkey_generate_file_audit_report',
     title: 'Generate a compliance audit report',
     description:
       'Queue a NIS2 or DORA compliance report for a file. The API accepts the job and returns a report id; ' +

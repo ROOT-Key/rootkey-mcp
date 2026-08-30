@@ -15,7 +15,7 @@ import {
   type ToolDefinition,
 } from './shared.js';
 
-const recoveryPointIdArg = z.string().min(1).describe('Recovery point id, from list_recovery_points.');
+const recoveryPointIdArg = z.string().min(1).describe('Recovery point id, from rootkey_list_recovery_points.');
 
 const DEFAULT_WAIT_SECONDS = 300;
 const MAX_WAIT_SECONDS = 1800;
@@ -49,7 +49,7 @@ async function findCreatedRecoveryPoint(
 
 export const recoveryTools: ToolDefinition[] = [
   {
-    name: 'list_recovery_points',
+    name: 'rootkey_list_recovery_points',
     title: 'List recovery points',
     description: 'List every recovery point (encrypted backup archive) in the workspace. This endpoint is not paginated.',
     readOnly: true,
@@ -65,14 +65,14 @@ export const recoveryTools: ToolDefinition[] = [
   },
 
   {
-    name: 'create_recovery_point',
+    name: 'rootkey_create_recovery_point',
     title: 'Create a recovery point',
     description:
       'Start building an encrypted backup archive of vault contents, either the whole workspace (global) or ' +
       'named vaults (partial). The API returns a one-time decryption password that can never be retrieved ' +
       'again - show it to the user immediately and tell them to store it. Because it has to be shown, it ' +
       'necessarily becomes part of this conversation: say so when you relay it, so the user can decide ' +
-      'what to do about the transcript. The archive builds asynchronously: poll get_recovery_point until ' +
+      'what to do about the transcript. The archive builds asynchronously: poll rootkey_get_recovery_point until ' +
       'status is completed before downloading.',
     inputSchema: {
       name: z.string().min(1).describe('Name for the recovery point.'),
@@ -113,8 +113,8 @@ export const recoveryTools: ToolDefinition[] = [
           `without it:\n\n    ${created.password}\n\nShowing it is the only way to deliver it, so it is now ` +
           `part of this conversation and of wherever this conversation is stored. It is kept out of this ` +
           `server's own logs either way. Once it is in a password manager, consider clearing this chat.` +
-          `\n\nThe archive is still building; poll get_recovery_point until its status is "completed" ` +
-          `before calling download_recovery_point.`
+          `\n\nThe archive is still building; poll rootkey_get_recovery_point until its status is "completed" ` +
+          `before calling rootkey_download_recovery_point.`
         : 'The API did not return a password for this recovery point.';
 
       return { notice, data: { password: created?.password ?? null, recoveryPoint } };
@@ -122,7 +122,7 @@ export const recoveryTools: ToolDefinition[] = [
   },
 
   {
-    name: 'get_recovery_point',
+    name: 'rootkey_get_recovery_point',
     title: 'Get recovery point status',
     description:
       'Fetch one recovery point to follow its build: status (enqueued, processing, completed, failed), ' +
@@ -142,11 +142,11 @@ export const recoveryTools: ToolDefinition[] = [
   },
 
   {
-    name: 'wait_for_recovery_point',
+    name: 'rootkey_wait_for_recovery_point',
     title: 'Wait for a recovery point to finish building',
     description:
       'Poll a recovery point until it reports "completed" or "failed", then return it. Use this instead ' +
-      'of calling get_recovery_point in a loop: an archive can take minutes, and every manual poll costs ' +
+      'of calling rootkey_get_recovery_point in a loop: an archive can take minutes, and every manual poll costs ' +
       'a full round trip through the conversation. Reports progress while it waits. If it returns with ' +
       'timedOut true the archive is still building and the recovery point is fine - call this again.',
     readOnly: true,
@@ -213,16 +213,16 @@ export const recoveryTools: ToolDefinition[] = [
       return {
         notice: settled
           ? status?.toLowerCase() === 'completed'
-            ? 'The archive is ready. download_recovery_point can fetch it now.'
+            ? 'The archive is ready. rootkey_download_recovery_point can fetch it now.'
             : `The archive finished in state "${status}". It cannot be downloaded.`
-          : `Still building after ${waitedSeconds}s. Nothing is wrong - call wait_for_recovery_point again.`,
+          : `Still building after ${waitedSeconds}s. Nothing is wrong - call rootkey_wait_for_recovery_point again.`,
         data: { status, timedOut: !settled, waitedSeconds, recoveryPoint: point },
       };
     },
   },
 
   {
-    name: 'download_recovery_point',
+    name: 'rootkey_download_recovery_point',
     title: 'Download a recovery point archive',
     description:
       'Download the encrypted archive to the local disk of the machine running this server. Only works once ' +
@@ -256,7 +256,7 @@ export const recoveryTools: ToolDefinition[] = [
       });
 
       return {
-        notice: 'Encrypted archive saved. Decrypting it needs the one-time password from create_recovery_point.',
+        notice: 'Encrypted archive saved. Decrypting it needs the one-time password from rootkey_create_recovery_point.',
         data: saved,
         links: [
           {
@@ -270,7 +270,7 @@ export const recoveryTools: ToolDefinition[] = [
   },
 
   {
-    name: 'delete_recovery_point',
+    name: 'rootkey_delete_recovery_point',
     title: 'Delete a recovery point',
     description:
       'Permanently delete a recovery point and the encrypted archive behind it. Unlike deleting a vault, ' +

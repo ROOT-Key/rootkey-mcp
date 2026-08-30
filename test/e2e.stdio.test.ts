@@ -33,7 +33,7 @@ describe('stdio end to end', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools).toHaveLength(27);
-      expect(tools.map((tool) => tool.name)).toContain('upload_file');
+      expect(tools.map((tool) => tool.name)).toContain('rootkey_upload_file');
 
       // The instructions are how Claude learns the API's missing pieces.
       const instructions = client.getInstructions() ?? '';
@@ -49,7 +49,7 @@ describe('stdio end to end', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools).toHaveLength(15);
-      expect(tools.map((tool) => tool.name)).not.toContain('delete_vault');
+      expect(tools.map((tool) => tool.name)).not.toContain('rootkey_delete_vault');
     } finally {
       await close();
     }
@@ -61,7 +61,7 @@ describe('stdio end to end', () => {
       ROOTKEY_ENV: 'development',
     });
     try {
-      const result = (await client.callTool({ name: 'get_environment_info', arguments: {} })) as CallToolResult;
+      const result = (await client.callTool({ name: 'rootkey_get_environment_info', arguments: {} })) as CallToolResult;
       const text = result.content.map((part) => ('text' in part ? part.text : '')).join('');
       const payload = JSON.parse(text) as Record<string, unknown>;
 

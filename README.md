@@ -83,15 +83,17 @@ Use an `rk_test_` key with `ROOTKEY_ENV=development` while you are trying things
 
 27 tools: every operation in the [public API](https://docs.rootkey.ai/api-reference/overview), plus a wait helper and one local diagnostic.
 
-**Vaults** - `create_vault`, `update_vault`, `delete_vault`
+Every tool is prefixed `rootkey_`. Names like `list_files` or `download_file` collide head-on with the filesystem servers people commonly run alongside this one, and an agent that picks the wrong `download_file` fails silently rather than loudly.
 
-**Files** - `list_files`, `upload_file`, `get_file`, `download_file`, `delete_file`, `list_file_versions`, `upload_file_version`, `validate_file`, `get_file_history`, `get_file_validations`, `generate_file_audit_report`
+**Vaults** - `rootkey_create_vault`, `rootkey_update_vault`, `rootkey_delete_vault`
 
-**Records** - `list_records`, `create_record`, `list_record_versions`, `get_record_history`, `get_record_validations`, `delete_record`
+**Files** - `rootkey_list_files`, `rootkey_upload_file`, `rootkey_get_file`, `rootkey_download_file`, `rootkey_delete_file`, `rootkey_list_file_versions`, `rootkey_upload_file_version`, `rootkey_validate_file`, `rootkey_get_file_history`, `rootkey_get_file_validations`, `rootkey_generate_file_audit_report`
 
-**Recovery points** - `list_recovery_points`, `create_recovery_point`, `get_recovery_point`, `wait_for_recovery_point`, `download_recovery_point`, `delete_recovery_point`
+**Records** - `rootkey_list_records`, `rootkey_create_record`, `rootkey_list_record_versions`, `rootkey_get_record_history`, `rootkey_get_record_validations`, `rootkey_delete_record`
 
-**Diagnostics** - `get_environment_info` (reports the configured environment, key type and tool count; makes no API call and never reveals the key)
+**Recovery points** - `rootkey_list_recovery_points`, `rootkey_create_recovery_point`, `rootkey_get_recovery_point`, `rootkey_wait_for_recovery_point`, `rootkey_download_recovery_point`, `rootkey_delete_recovery_point`
+
+**Diagnostics** - `rootkey_get_environment_info` (reports the configured environment, key type and tool count; makes no API call and never reveals the key)
 
 Read tools carry `readOnlyHint` and the four delete tools carry `destructiveHint`, so clients can gate them. The two download tools sit in between: they change nothing in your ROOTKey workspace, so they run in read-only mode, but they do write a file to your disk, so they do not claim `readOnlyHint`.
 
@@ -112,13 +114,13 @@ In read-only mode only `compliance_evidence_pack` is offered, since the other th
 
 ## Things worth knowing
 
-- **Vault addresses come from the dashboard.** The ROOTKey API has no endpoint that lists vaults, so this server cannot offer one. `create_vault` returns the address of what it creates; keep it.
+- **Vault addresses come from the dashboard.** The ROOTKey API has no endpoint that lists vaults, so this server cannot offer one. `rootkey_create_vault` returns the address of what it creates; keep it.
 - **Uploads and downloads use local disk.** Files are read from, and written to, the machine running the server. Download tools return the saved path plus a `resource_link` the client can open, rather than inlining file contents into the conversation. An existing file is never overwritten.
-- **Uploads can only read from a few directories.** `upload_file`, `upload_file_version` and `validate_file` read a path off your disk and send it to the API, so they are confined to your home directory, the temp directory and wherever the server was started -- and they refuse hidden directories inside those, because `~/.ssh` and `~/.aws` hold credentials far more often than they hold documents anyone meant to anchor. Symlinks are resolved before the check, so a link cannot walk out. Widen or narrow it with `ROOTKEY_ALLOWED_DIRS`. This matters because the path can come from the model, and the model reads documents that other people wrote.
+- **Uploads can only read from a few directories.** `rootkey_upload_file`, `rootkey_upload_file_version` and `rootkey_validate_file` read a path off your disk and send it to the API, so they are confined to your home directory, the temp directory and wherever the server was started -- and they refuse hidden directories inside those, because `~/.ssh` and `~/.aws` hold credentials far more often than they hold documents anyone meant to anchor. Symlinks are resolved before the check, so a link cannot walk out. Widen or narrow it with `ROOTKEY_ALLOWED_DIRS`. This matters because the path can come from the model, and the model reads documents that other people wrote.
 - **Deleting a vault, file or record moves it to the trash**, not off the planet. It vanishes from every list tool at once and stays recoverable from the Restore Center in the dashboard until the retention policy purges it. Deleting a *recovery point* is the exception: that one erases the archive for good. All four are annotated as destructive so Claude asks first.
 - **Only files are anchored on chain.** Records are stored, hashed and audited, and come back `REGISTERED` immediately -- there is no pending phase and no transaction hash. The tool descriptions say so, because "your data is on a blockchain" is a compliance claim and it is only true of files.
 - **Records are versioned by primary key.** Creating a record whose key matches an existing one adds a version rather than a duplicate, so retrying a create is not a no-op.
-- **The recovery point password is shown once, and it lands in your chat.** `create_recovery_point` surfaces it prominently and keeps it out of this server's logs -- but the only way to deliver it is to put it in the tool result, so it becomes part of the conversation and goes wherever that conversation is stored. Without it the archive cannot be decrypted: put it in a password manager, then consider clearing the chat.
+- **The recovery point password is shown once, and it lands in your chat.** `rootkey_create_recovery_point` surfaces it prominently and keeps it out of this server's logs -- but the only way to deliver it is to put it in the tool result, so it becomes part of the conversation and goes wherever that conversation is stored. Without it the archive cannot be decrypted: put it in a password manager, then consider clearing the chat.
 - **Audit reports are queued, not returned.** The API accepts the job and delivers the finished report in the dashboard; there is no endpoint to fetch it.
 - **Read-only mode is a convenience rail, not a security boundary.** ROOTKey API keys have no scopes and carry the full privileges of the account that owns them. Anything holding the key can do anything the account can, whatever this server registers. What the mode *does* guarantee is local: no tool it registers changes your workspace, and the two that write to disk are pinned to the download directory.
 
