@@ -63,8 +63,10 @@ export const recoveryTools: ToolDefinition[] = [
     description:
       'Start building an encrypted backup archive of vault contents, either the whole workspace (global) or ' +
       'named vaults (partial). The API returns a one-time decryption password that can never be retrieved ' +
-      'again - show it to the user immediately and tell them to store it. The archive builds asynchronously: ' +
-      'poll get_recovery_point until status is completed before downloading.',
+      'again - show it to the user immediately and tell them to store it. Because it has to be shown, it ' +
+      'necessarily becomes part of this conversation: say so when you relay it, so the user can decide ' +
+      'what to do about the transcript. The archive builds asynchronously: poll get_recovery_point until ' +
+      'status is completed before downloading.',
     inputSchema: {
       name: z.string().min(1).describe('Name for the recovery point.'),
       scope: z.enum(['global', 'partial']).describe('"global" covers everything; "partial" covers the listed vaults.'),
@@ -101,8 +103,11 @@ export const recoveryTools: ToolDefinition[] = [
 
       const notice = created?.password
         ? `ONE-TIME PASSWORD - shown once and unrecoverable. Store it now, the archive cannot be decrypted ` +
-          `without it:\n\n    ${created.password}\n\nThe archive is still building; poll get_recovery_point ` +
-          `until its status is "completed" before calling download_recovery_point.`
+          `without it:\n\n    ${created.password}\n\nShowing it is the only way to deliver it, so it is now ` +
+          `part of this conversation and of wherever this conversation is stored. It is kept out of this ` +
+          `server's own logs either way. Once it is in a password manager, consider clearing this chat.` +
+          `\n\nThe archive is still building; poll get_recovery_point until its status is "completed" ` +
+          `before calling download_recovery_point.`
         : 'The API did not return a password for this recovery point.';
 
       return { notice, data: { password: created?.password ?? null, recoveryPoint } };
