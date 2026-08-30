@@ -49,7 +49,10 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
       {
         title: definition.title,
         description: definition.description,
-        inputSchema: definition.inputSchema,
+        // `.strict()` rather than the raw shape: it emits `additionalProperties: false`, which is the
+        // form the spec recommends for a no-argument tool, and it turns a hallucinated or misspelled
+        // argument into an error the model can read and correct instead of a value silently dropped.
+        inputSchema: z.object(definition.inputSchema).strict(),
         annotations: {
           title: definition.title,
           readOnlyHint: definition.readOnly === true,

@@ -124,6 +124,41 @@ describe('tool registration', () => {
   });
 });
 
+describe('input schemas', () => {
+  it('publishes additionalProperties: false, including for the no-argument tools', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+
+      for (const tool of tools) {
+        expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
+      }
+
+      const local = tools.find((tool) => tool.name === 'get_environment_info');
+      expect(local?.inputSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
+    } finally {
+      await close();
+    }
+  });
+
+  // Surfaced as a tool execution error rather than a JSON-RPC protocol error, which is the shape the
+  // spec says clients should hand back to the model so it can self-correct.
+  it('names the offending key when an unknown argument is passed', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const result = (await client.callTool({
+        name: 'get_environment_info',
+        arguments: { bogus: 1 },
+      })) as CallToolResult;
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain("Unrecognized key(s) in object: 'bogus'");
+    } finally {
+      await close();
+    }
+  });
+});
+
 describe('vault address mapping', () => {
   it('sends vaultAddress as ownerVault when fetching a file', async () => {
     await withClient([{ json: { chainId: 137, file: { id: 'f1' } } }], async (call, stub) => {
