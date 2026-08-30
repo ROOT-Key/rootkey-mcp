@@ -71,6 +71,16 @@ describe('normalizeBaseUrl', () => {
     expect(normalizeBaseUrl('https://api.rootkey.ai/api-v1?debug=1#x')).toBe('https://api.rootkey.ai/api-v1/');
   });
 
+  // The API key rides in a header on every request, so plain http would put it on the wire in clear.
+  it('rejects plain http for a remote host but allows it on loopback', () => {
+    expect(() => normalizeBaseUrl('http://api.rootkey.ai/api-v1')).toThrow(/unencrypted/);
+    expect(() => normalizeBaseUrl('http://192.168.1.10:3333/api-v1')).toThrow(/unencrypted/);
+
+    expect(normalizeBaseUrl('http://localhost:3333/api-v1')).toBe('http://localhost:3333/api-v1/');
+    expect(normalizeBaseUrl('http://127.0.0.1:3333/api-v1')).toBe('http://127.0.0.1:3333/api-v1/');
+    expect(normalizeBaseUrl('http://[::1]:3333/api-v1')).toBe('http://[::1]:3333/api-v1/');
+  });
+
   it('rejects values that are not absolute http(s) URLs', () => {
     expect(() => normalizeBaseUrl('api.rootkey.ai')).toThrow(ConfigError);
     expect(() => normalizeBaseUrl('ftp://api.rootkey.ai')).toThrow(ConfigError);

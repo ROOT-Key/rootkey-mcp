@@ -69,7 +69,7 @@ Commit a `.mcp.json` at the root of your repository and let each person supply t
 | --- | --- | --- |
 | `ROOTKEY_API_KEY` | required | Your ROOTKey API key. The server exits immediately if it is missing. |
 | `ROOTKEY_ENV` | `production` | `production` or `development`. Picks the matching API base URL. |
-| `ROOTKEY_API_URL` | - | Full base URL, including the `/api-v1/` path. Overrides `ROOTKEY_ENV`. |
+| `ROOTKEY_API_URL` | - | Full base URL, including the `/api-v1/` path. Overrides `ROOTKEY_ENV`. Plain `http://` is accepted only for loopback hosts. |
 | `ROOTKEY_READ_ONLY` | `false` | When true, only the 14 read tools are registered, and downloads may only write inside `ROOTKEY_DOWNLOAD_DIR`. |
 | `ROOTKEY_TIMEOUT_MS` | `30000` | Timeout for ordinary requests. |
 | `ROOTKEY_TRANSFER_TIMEOUT_MS` | `300000` | Timeout for uploads and downloads. |

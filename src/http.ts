@@ -33,6 +33,11 @@ const MAX_RETRY_AFTER_MS = 30_000;
  */
 const REPEATABLE_METHODS = new Set<HttpMethod>(['GET', 'PUT', 'DELETE']);
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
+const MAX_REDIRECTS = 5;
+
+function isRedirect(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
 
 export class RootKeyClient {
   constructor(private readonly config: Config) {}
@@ -83,12 +88,7 @@ export class RootKeyClient {
       let response: Response;
       try {
         log.debug(`${options.method} ${url.pathname}${url.search} (attempt ${attempt})`);
-        response = await fetch(url, {
-          method: options.method,
-          headers: this.buildHeaders(options),
-          body: this.buildBody(options),
-          signal,
-        });
+        response = await this.fetchFollowingRedirects(url, options, signal);
       } catch (cause) {
         lastError = toTransportError(cause, url, options.signal, timeoutMs);
         if (attempt < MAX_ATTEMPTS && REPEATABLE_METHODS.has(options.method) && !isAbortedByCaller(options.signal)) {
@@ -119,11 +119,54 @@ export class RootKeyClient {
     throw lastError ?? new NetworkError(`Request to ${url.toString()} failed after ${MAX_ATTEMPTS} attempts.`);
   }
 
-  private buildHeaders(options: RequestOptions): Record<string, string> {
+  /**
+   * `redirect: 'manual'` plus an explicit walk, so a hop to another origin drops the API key.
+   *
+   * The runtime's automatic redirect following strips `Authorization` across origins but knows nothing
+   * about `x-api-key`, so it would forward the credential to whatever host the Location names. The
+   * download endpoint streams today rather than redirecting to a signed URL, but the day it changes
+   * the key must not be the thing that goes along for the ride.
+   */
+  private async fetchFollowingRedirects(
+    url: URL,
+    options: RequestOptions,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    let target = url;
+    let carryCredentials = true;
+
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const response = await fetch(target, {
+        method: options.method,
+        headers: this.buildHeaders(options, carryCredentials),
+        body: hop === 0 ? this.buildBody(options) : undefined,
+        redirect: 'manual',
+        signal,
+      });
+
+      if (!isRedirect(response.status)) return response;
+
+      const location = response.headers.get('location');
+      if (!location) return response;
+
+      const next = new URL(location, target);
+      await response.body?.cancel().catch(() => undefined);
+
+      if (next.origin !== target.origin) {
+        log.debug(`redirect to ${next.origin}: continuing without the API key`);
+        carryCredentials = false;
+      }
+      target = next;
+    }
+
+    throw new NetworkError(`Too many redirects following ${url.pathname} (limit ${MAX_REDIRECTS}).`);
+  }
+
+  private buildHeaders(options: RequestOptions, carryCredentials = true): Record<string, string> {
     const headers: Record<string, string> = {
-      'x-api-key': this.config.apiKey,
       accept: options.responseType === 'binary' ? '*/*' : 'application/json',
     };
+    if (carryCredentials) headers['x-api-key'] = this.config.apiKey;
     // Multipart must not carry an explicit content-type: fetch generates the boundary.
     if (options.body !== undefined && options.form === undefined) {
       headers['content-type'] = 'application/json';
