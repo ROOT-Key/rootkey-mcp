@@ -18,15 +18,28 @@ import {
 
 const fileIdArg = z.string().min(1).describe('File id, as returned by list_files.');
 
+/** Absent on the row means "cannot tell", which must not disqualify an otherwise exact match. */
+function sizeMatches(item: FileSummary, sizeBytes: number): boolean {
+  const reported = item.sizeBytes;
+  if (reported === undefined || reported === null) return true;
+  return Number(reported) === sizeBytes;
+}
+
 /**
  * Upload endpoints answer with a transaction hash but no file id, so the created file is looked up
  * afterwards. The lookup is best effort: never let it turn a successful upload into a failed tool call.
+ *
+ * The API's `name` filter is a case-insensitive `contains`, so a row coming back is not evidence that
+ * it is the row we just wrote. The identity we return flows straight into get_file and delete_file, so
+ * a near-miss is worse than no answer: match the exact name AND the exact byte count, newest first,
+ * and return null rather than a plausible-looking neighbour.
  */
 async function findUploadedFile(
   ctx: ToolContext,
   path: string,
   vaultAddress: string,
   fileName: string,
+  sizeBytes: number,
   signal: AbortSignal | undefined,
 ): Promise<FileSummary | null> {
   try {
@@ -37,7 +50,7 @@ async function findUploadedFile(
       signal,
     });
     const items = normalizePage(payload).items as FileSummary[];
-    return items.find((item) => item?.name === fileName) ?? items[0] ?? null;
+    return items.find((item) => item?.name === fileName && sizeMatches(item, sizeBytes)) ?? null;
   } catch (error) {
     log.debug(`post-upload lookup failed: ${error instanceof Error ? error.message : String(error)}`);
     return null;
@@ -106,13 +119,13 @@ export const fileTools: ToolDefinition[] = [
         signal: extra.signal,
       });
 
-      const file = await findUploadedFile(ctx, 'platform/files', vaultAddress, fileName, extra.signal);
+      const file = await findUploadedFile(ctx, 'platform/files', vaultAddress, fileName, sizeBytes, extra.signal);
 
       return {
         notice: file
           ? undefined
-          : 'The upload succeeded but the follow-up lookup did not find the file id yet. Anchoring is ' +
-            'asynchronous - call list_files on this vault in a moment to get it.',
+          : 'The upload succeeded. The follow-up lookup could not yet identify the new file with certainty, ' +
+            'so no id is reported rather than a guess - call list_files on this vault in a moment to get it.',
         data: { ...receipt, fileName, sizeBytes, file },
       };
     },
@@ -248,12 +261,13 @@ export const fileTools: ToolDefinition[] = [
         signal: extra.signal,
       });
 
-      const version = await findUploadedFile(ctx, versionsPath, vaultAddress, fileName, extra.signal);
+      const version = await findUploadedFile(ctx, versionsPath, vaultAddress, fileName, sizeBytes, extra.signal);
 
       return {
         notice: version
           ? undefined
-          : 'The version was uploaded but the follow-up lookup did not return it yet. Call list_file_versions shortly.',
+          : 'The version was uploaded. The follow-up lookup could not yet identify it with certainty, so no ' +
+            'id is reported rather than a guess - call list_file_versions shortly to get it.',
         data: { ...receipt, fileName, sizeBytes, version },
       };
     },

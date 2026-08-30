@@ -8,6 +8,8 @@ export interface FileSummary {
   name?: string;
   status?: string;
   createdAt?: string;
+  /** Read back after an upload to tell our new row apart from a same-named neighbour. */
+  sizeBytes?: number | string;
   [key: string]: unknown;
 }
 
