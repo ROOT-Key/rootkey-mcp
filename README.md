@@ -129,9 +129,12 @@ In read-only mode only `compliance_evidence_pack` is offered, since the other th
 ```bash
 npm install
 npm run typecheck
-npm run build
 npm test
 ```
+
+`npm test` builds first, because `test/e2e.stdio.test.ts` spawns `dist/index.js` and would otherwise happily pass against a stale bundle.
+
+`test/contract.test.ts` drives every tool against a stubbed transport and checks what it puts on the wire against `test/fixtures/openapi-v2.json` -- method, path, and every parameter the spec marks required. That fixture is a copy of `api-reference/openapi-v2.json` from the docs repository; refresh it when the public API changes, and read the diff rather than working around it.
 
 Inspect the built server with the MCP Inspector (it does not inherit your shell environment, so pass the key with `-e`):
 
