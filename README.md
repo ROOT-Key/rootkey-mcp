@@ -98,7 +98,8 @@ Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHin
 
 - **Vault addresses come from the dashboard.** The ROOTKey API has no endpoint that lists vaults, so this server cannot offer one. `create_vault` returns the address of what it creates; keep it.
 - **Uploads and downloads use local disk.** Files are read from, and written to, the machine running the server, and download tools return a path rather than inlining file contents. An existing file is never overwritten.
-- **Deletes are permanent** and recorded on chain. They are annotated as destructive so Claude asks first.
+- **Deleting a vault, file or record moves it to the trash**, not off the planet. It vanishes from every list tool at once and stays recoverable from the Restore Center in the dashboard until the retention policy purges it. Deleting a *recovery point* is the exception: that one erases the archive for good. All four are annotated as destructive so Claude asks first.
+- **Only files are anchored on chain.** Records are stored, hashed and audited, and come back `REGISTERED` immediately -- there is no pending phase and no transaction hash. The tool descriptions say so, because "your data is on a blockchain" is a compliance claim and it is only true of files.
 - **Records are versioned by primary key.** Creating a record whose key matches an existing one adds a version rather than a duplicate, so retrying a create is not a no-op.
 - **The recovery point password is shown once.** `create_recovery_point` surfaces it prominently and it is never written to the logs; without it the archive cannot be decrypted.
 - **Audit reports are queued, not returned.** The API accepts the job and delivers the finished report in the dashboard; there is no endpoint to fetch it.

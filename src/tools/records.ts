@@ -97,9 +97,11 @@ export const recordTools: ToolDefinition[] = [
     name: 'create_record',
     title: 'Create a record',
     description:
-      'Write a record into a table and anchor it. Records are versioned by primary key: posting a payload ' +
-      'whose key column matches an existing record creates a NEW VERSION of that record rather than a ' +
-      'duplicate, so calling this twice is not a no-op. Records are limited to 1 MB.',
+      'Write a record into a table. Records are versioned by primary key: posting a payload whose key column ' +
+      'matches an existing record creates a NEW VERSION of that record rather than a duplicate, so calling ' +
+      'this twice is not a no-op. Records are limited to 1 MB. Unlike files, records are NOT anchored on ' +
+      'chain: the row is stored, hashed and audited, comes back REGISTERED straight away, and has no ' +
+      'transaction hash - do not describe it to the user as being on a blockchain.',
     inputSchema: {
       vaultAddress: vaultAddressArg,
       recordData: z
@@ -213,7 +215,9 @@ export const recordTools: ToolDefinition[] = [
     name: 'delete_record',
     title: 'Delete a record',
     description:
-      'Permanently delete a record. Irreversible and audited on chain - confirm with the user first.',
+      'Delete a record. It moves to the trash: it stops appearing in list_records immediately, and stays ' +
+      'recoverable from the Restore Center in the ROOTKey dashboard until the retention policy purges it ' +
+      'for good. Confirm with the user first.',
     destructive: true,
     idempotent: true,
     inputSchema: {
