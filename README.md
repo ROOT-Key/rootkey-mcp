@@ -74,6 +74,7 @@ Commit a `.mcp.json` at the root of your repository and let each person supply t
 | `ROOTKEY_TIMEOUT_MS` | `30000` | Timeout for ordinary requests. |
 | `ROOTKEY_TRANSFER_TIMEOUT_MS` | `300000` | Timeout for uploads and downloads. |
 | `ROOTKEY_DOWNLOAD_DIR` | `~/Downloads` | Where downloads land when no path is given. |
+| `ROOTKEY_ALLOWED_DIRS` | home, temp, cwd | Directories uploads may read from, separated by `;` on Windows and `:` elsewhere. |
 | `ROOTKEY_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info` or `debug`. Logs go to stderr. |
 
 Use an `rk_test_` key with `ROOTKEY_ENV=development` while you are trying things out: the development environment anchors nothing on Polygon Mainnet and costs no credits.
@@ -98,6 +99,7 @@ Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHin
 
 - **Vault addresses come from the dashboard.** The ROOTKey API has no endpoint that lists vaults, so this server cannot offer one. `create_vault` returns the address of what it creates; keep it.
 - **Uploads and downloads use local disk.** Files are read from, and written to, the machine running the server, and download tools return a path rather than inlining file contents. An existing file is never overwritten.
+- **Uploads can only read from a few directories.** `upload_file`, `upload_file_version` and `validate_file` read a path off your disk and send it to the API, so they are confined to your home directory, the temp directory and wherever the server was started -- and they refuse hidden directories inside those, because `~/.ssh` and `~/.aws` hold credentials far more often than they hold documents anyone meant to anchor. Symlinks are resolved before the check, so a link cannot walk out. Widen or narrow it with `ROOTKEY_ALLOWED_DIRS`. This matters because the path can come from the model, and the model reads documents that other people wrote.
 - **Deleting a vault, file or record moves it to the trash**, not off the planet. It vanishes from every list tool at once and stays recoverable from the Restore Center in the dashboard until the retention policy purges it. Deleting a *recovery point* is the exception: that one erases the archive for good. All four are annotated as destructive so Claude asks first.
 - **Only files are anchored on chain.** Records are stored, hashed and audited, and come back `REGISTERED` immediately -- there is no pending phase and no transaction hash. The tool descriptions say so, because "your data is on a blockchain" is a compliance claim and it is only true of files.
 - **Records are versioned by primary key.** Creating a record whose key matches an existing one adds a version rather than a duplicate, so retrying a create is not a no-op.

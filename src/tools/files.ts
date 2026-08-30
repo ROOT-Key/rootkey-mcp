@@ -99,18 +99,29 @@ export const fileTools: ToolDefinition[] = [
       'asynchronous: the file starts PENDING and becomes REGISTERED or FAILED. Returns the transaction hash ' +
       'and, when the follow-up lookup succeeds, the created file record.',
     inputSchema: {
-      filePath: z.string().min(1).describe('Absolute path to the file on the machine running this server.'),
+      filePath: z
+        .string()
+        .min(1)
+        .describe(
+          'Absolute path to the file on the machine running this server. Reads are confined to the home ' +
+            'directory, the temp directory and the server working directory, and hidden directories inside ' +
+            'them are refused; ROOTKEY_ALLOWED_DIRS overrides that list.',
+        ),
       vaultAddress: vaultAddressArg,
       fileName: z.string().optional().describe('Name to register. Defaults to the file name on disk.'),
       expirationDate: isoDateTime.optional().describe('Optional expiration timestamp for the anchor.'),
     },
     handler: async (args, ctx, extra) => {
       const vaultAddress = requireString(args, 'vaultAddress');
-      const { form, fileName, sizeBytes } = await buildFileForm(requireString(args, 'filePath'), {
-        ownerVault: vaultAddress,
-        fileName: optionalString(args, 'fileName'),
-        expirationDate: optionalString(args, 'expirationDate'),
-      });
+      const { form, fileName, sizeBytes } = await buildFileForm(
+        requireString(args, 'filePath'),
+        {
+          ownerVault: vaultAddress,
+          fileName: optionalString(args, 'fileName'),
+          expirationDate: optionalString(args, 'expirationDate'),
+        },
+        ctx.config.allowedRoots,
+      );
 
       const receipt = await ctx.client.request<CreateSmartContractResponse>({
         method: 'POST',
@@ -247,11 +258,15 @@ export const fileTools: ToolDefinition[] = [
     handler: async (args, ctx, extra) => {
       const parentId = requireString(args, 'parentId');
       const vaultAddress = requireString(args, 'vaultAddress');
-      const { form, fileName, sizeBytes } = await buildFileForm(requireString(args, 'filePath'), {
-        ownerVault: vaultAddress,
-        fileName: optionalString(args, 'fileName'),
-        expirationDate: optionalString(args, 'expirationDate'),
-      });
+      const { form, fileName, sizeBytes } = await buildFileForm(
+        requireString(args, 'filePath'),
+        {
+          ownerVault: vaultAddress,
+          fileName: optionalString(args, 'fileName'),
+          expirationDate: optionalString(args, 'expirationDate'),
+        },
+        ctx.config.allowedRoots,
+      );
 
       const versionsPath = `platform/files/${encodeURIComponent(parentId)}/versions`;
       const receipt = await ctx.client.request<CreateSmartContractResponse>({
@@ -286,12 +301,16 @@ export const fileTools: ToolDefinition[] = [
       vaultAddress: vaultAddressArg,
     },
     handler: async (args, ctx, extra) => {
-      const { form } = await buildFileForm(requireString(args, 'filePath'), {
-        ownerVault: requireString(args, 'vaultAddress'),
-        // Required by the endpoint, but the API branches on nothing and always answers
-        // "SHA-256 Hash Comparison". Sent as a constant rather than offered as a choice.
-        method: 'hash',
-      });
+      const { form } = await buildFileForm(
+        requireString(args, 'filePath'),
+        {
+          ownerVault: requireString(args, 'vaultAddress'),
+          // Required by the endpoint, but the API branches on nothing and always answers
+          // "SHA-256 Hash Comparison". Sent as a constant rather than offered as a choice.
+          method: 'hash',
+        },
+        ctx.config.allowedRoots,
+      );
 
       const data = await ctx.client.request({
         method: 'POST',

@@ -6,6 +6,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { Config } from '../config.js';
 import { ApiError, NetworkError, ToolInputError } from '../errors.js';
+import { assertReadableFile } from '../paths.js';
 import type { RootKeyClient } from '../http.js';
 import { log } from '../log.js';
 
@@ -163,8 +164,9 @@ export function optionalString(args: Record<string, unknown>, key: string): stri
 export async function buildFileForm(
   filePath: string,
   fields: Record<string, string | undefined>,
+  allowedRoots: string[],
 ): Promise<{ form: FormData; fileName: string; sizeBytes: number }> {
-  const resolved = path.resolve(filePath);
+  const resolved = await assertReadableFile(filePath, allowedRoots);
 
   let info;
   try {

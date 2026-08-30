@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -236,6 +236,47 @@ describe('argument validation', () => {
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain('at least one field');
     });
+  });
+
+  /**
+   * The path an upload reads can be chosen by the model, and the model reads documents other people
+   * wrote. This asserts the refusal happens before the file ever reaches the wire.
+   */
+  it('refuses to upload from outside the allowed roots, without calling the API', async () => {
+    const allowed = await mkdtemp(path.join(tmpdir(), 'rootkey-allowed-'));
+    const elsewhere = await mkdtemp(path.join(tmpdir(), 'rootkey-elsewhere-'));
+    const filePath = path.join(elsewhere, 'secret.txt');
+    await writeFile(filePath, 'x');
+
+    await withClient(
+      [{ json: {} }],
+      async (call, stub) => {
+        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('ROOTKEY_ALLOWED_DIRS');
+        expect(stub.calls).toHaveLength(0);
+      },
+      testConfig({ allowedRoots: [allowed] }),
+    );
+  });
+
+  it('refuses to upload from a hidden directory inside an allowed root', async () => {
+    const allowed = await mkdtemp(path.join(tmpdir(), 'rootkey-allowed-'));
+    const hidden = path.join(allowed, '.ssh');
+    await mkdir(hidden);
+    const filePath = path.join(hidden, 'id_rsa');
+    await writeFile(filePath, 'x');
+
+    await withClient(
+      [{ json: {} }],
+      async (call, stub) => {
+        const result = await call('validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('hidden directory');
+        expect(stub.calls).toHaveLength(0);
+      },
+      testConfig({ allowedRoots: [allowed] }),
+    );
   });
 
   it('reports a missing upload file without calling the API', async () => {

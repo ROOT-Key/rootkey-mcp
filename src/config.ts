@@ -1,4 +1,5 @@
 import { LOG_LEVELS, type LogLevel } from './log.js';
+import { defaultAllowedRoots, parseAllowedRoots } from './paths.js';
 
 export const PRODUCTION_BASE_URL = 'https://api.rootkey.ai/api-v1/';
 export const DEVELOPMENT_BASE_URL = 'https://dev-api.rootkey.ai/api-v1/';
@@ -15,6 +16,8 @@ export interface Config {
   timeoutMs: number;
   transferTimeoutMs: number;
   downloadDir: string | undefined;
+  /** Absolute roots that upload_file, upload_file_version and validate_file may read from. */
+  allowedRoots: string[];
   logLevel: LogLevel;
 }
 
@@ -113,6 +116,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       'ROOTKEY_TRANSFER_TIMEOUT_MS',
     ),
     downloadDir: downloadDir && downloadDir.length > 0 ? downloadDir : undefined,
+    allowedRoots: parseAllowedRoots(env.ROOTKEY_ALLOWED_DIRS) ?? defaultAllowedRoots(),
     logLevel: (rawLogLevel as LogLevel | undefined) ?? 'info',
   };
 }
