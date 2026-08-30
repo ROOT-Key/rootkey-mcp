@@ -6,6 +6,7 @@ import type { RecordRow } from '../types.js';
 import {
   isoDateTime,
   optionalString,
+  pageOutputSchema,
   pagedQuery,
   paginationArgs,
   requireString,
@@ -75,6 +76,7 @@ export const recordTools: ToolDefinition[] = [
       status: statusFilter.optional(),
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -159,6 +161,7 @@ export const recordTools: ToolDefinition[] = [
       vaultAddress: vaultAddressArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -179,6 +182,7 @@ export const recordTools: ToolDefinition[] = [
       recordId: recordIdArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -200,6 +204,7 @@ export const recordTools: ToolDefinition[] = [
       recordId: recordIdArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',

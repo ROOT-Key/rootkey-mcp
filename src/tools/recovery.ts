@@ -9,6 +9,7 @@ import {
   optionalString,
   readOnlyWriteRoot,
   requireString,
+  savedFileOutputSchema,
   type ToolContext,
   type ToolDefinition,
 } from './shared.js';
@@ -151,6 +152,7 @@ export const recoveryTools: ToolDefinition[] = [
         .optional()
         .describe('Target file path or an existing directory. Defaults to ROOTKEY_DOWNLOAD_DIR, then ~/Downloads.'),
     },
+    outputSchema: savedFileOutputSchema,
     handler: async (args, ctx, extra) => {
       const id = requireString(args, 'recoveryPointId');
       const response = await ctx.client.requestBinary({

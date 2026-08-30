@@ -93,7 +93,9 @@ Use an `rk_test_` key with `ROOTKEY_ENV=development` while you are trying things
 
 **Diagnostics** - `get_environment_info` (reports the configured environment, key type and tool count; makes no API call and never reveals the key)
 
-Read tools carry `readOnlyHint`, and the four delete tools carry `destructiveHint`, so clients can gate them. The two download tools are the exception: they change nothing in your ROOTKey workspace, so they run in read-only mode, but they do write a file to your disk, so they do not claim `readOnlyHint`.
+Read tools carry `readOnlyHint` and the four delete tools carry `destructiveHint`, so clients can gate them. The two download tools sit in between: they change nothing in your ROOTKey workspace, so they run in read-only mode, but they do write a file to your disk, so they do not claim `readOnlyHint`.
+
+The eleven tools whose payload this server shapes -- every listing, both downloads and the diagnostic -- publish an `outputSchema` and return `structuredContent`, so a client can validate the result instead of parsing prose. The other fifteen hand back the API response untouched and deliberately declare no schema.
 
 ## Things worth knowing
 

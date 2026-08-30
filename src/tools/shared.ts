@@ -44,6 +44,12 @@ export interface ToolDefinition {
   idempotent?: boolean;
   /** Local-only tools do not talk to the API. */
   local?: boolean;
+  /**
+   * Declared only where this server shapes the payload itself. Where a tool hands back the API
+   * response untouched, a schema would be a guess about someone else's contract that goes stale
+   * silently, so those tools deliberately have none.
+   */
+  outputSchema?: z.ZodTypeAny;
   handler: (args: Record<string, unknown>, ctx: ToolContext, extra: HandlerExtra) => Promise<ToolOutput>;
 }
 
@@ -62,6 +68,7 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
         // form the spec recommends for a no-argument tool, and it turns a hallucinated or misspelled
         // argument into an error the model can read and correct instead of a value silently dropped.
         inputSchema: z.object(definition.inputSchema).strict(),
+        ...(definition.outputSchema ? { outputSchema: definition.outputSchema } : {}),
         annotations: {
           title: definition.title,
           readOnlyHint: definition.readOnly === true && definition.writesLocalFiles !== true,
@@ -73,7 +80,7 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
       async (args: Record<string, unknown>, extra: { signal?: AbortSignal }): Promise<CallToolResult> => {
         try {
           const output = await definition.handler(args ?? {}, ctx, { signal: extra?.signal });
-          return toolSuccess(output);
+          return toolSuccess(output, definition.outputSchema !== undefined);
         } catch (error) {
           return toolFailure(definition.name, error);
         }
@@ -86,11 +93,20 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
   return registered;
 }
 
-function toolSuccess(output: ToolOutput): CallToolResult {
+/**
+ * The JSON is emitted compactly. Pretty-printing a page of results costs real tokens on every call
+ * for indentation no model needs, and a client that wants it formatted can format it.
+ *
+ * `structuredContent` carries the same value where the tool declares an output schema; the text block
+ * stays regardless, because the spec asks for it as the backwards-compatible half.
+ */
+function toolSuccess(output: ToolOutput, structured: boolean): CallToolResult {
   const content: CallToolResult['content'] = [];
   if (output.notice) content.push({ type: 'text', text: output.notice });
-  content.push({ type: 'text', text: JSON.stringify(output.data ?? null, null, 2) });
-  return { content };
+  content.push({ type: 'text', text: JSON.stringify(output.data ?? null) });
+
+  if (!structured) return { content };
+  return { content, structuredContent: output.data as Record<string, unknown> };
 }
 
 function toolFailure(toolName: string, error: unknown): CallToolResult {
@@ -136,6 +152,30 @@ export const statusFilter = z
     'Filter by anchoring status. Filters are lowercase while returned values are uppercase ' +
       '(PENDING, REGISTERED, FAILED); "error" matches FAILED.',
   );
+
+/**
+ * The envelope `normalizePage` produces. `passthrough` matters: the API's extra top-level fields
+ * (chainId, currentHash, previousHash) are carried through deliberately, and a closed schema would
+ * make the SDK reject the very payloads this server exists to relay.
+ */
+export const pageOutputSchema = z
+  .object({
+    items: z.array(z.unknown()).describe('The rows for this page.'),
+    pagination: z.object({
+      nextCursor: z.string().nullable().describe('Pass back as `cursor` to page forward. Null on the last page.'),
+      previousCursor: z.string().nullable(),
+    }),
+    metadata: z.unknown().optional().describe('Aggregate counters, when the endpoint reports any.'),
+  })
+  .passthrough();
+
+export const savedFileOutputSchema = z
+  .object({
+    savedPath: z.string().describe('Absolute path on the machine running this server.'),
+    sizeBytes: z.number(),
+    fileName: z.string(),
+  })
+  .passthrough();
 
 export function pagedQuery(args: Record<string, unknown>): Record<string, string | number | undefined> {
   return {

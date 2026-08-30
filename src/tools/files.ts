@@ -7,10 +7,12 @@ import {
   buildFileForm,
   isoDateTime,
   optionalString,
+  pageOutputSchema,
   pagedQuery,
   paginationArgs,
   readOnlyWriteRoot,
   requireString,
+  savedFileOutputSchema,
   statusFilter,
   vaultAddressArg,
   type ToolContext,
@@ -74,6 +76,7 @@ export const fileTools: ToolDefinition[] = [
       status: statusFilter.optional(),
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -181,6 +184,7 @@ export const fileTools: ToolDefinition[] = [
         .optional()
         .describe('Target file path or an existing directory. Defaults to ROOTKEY_DOWNLOAD_DIR, then ~/Downloads.'),
     },
+    outputSchema: savedFileOutputSchema,
     handler: async (args, ctx, extra) => {
       const fileId = requireString(args, 'fileId');
       const response = await ctx.client.requestBinary({
@@ -235,6 +239,7 @@ export const fileTools: ToolDefinition[] = [
       vaultAddress: vaultAddressArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -337,6 +342,7 @@ export const fileTools: ToolDefinition[] = [
       fileId: fileIdArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',
@@ -357,6 +363,7 @@ export const fileTools: ToolDefinition[] = [
       fileId: fileIdArg,
       ...paginationArgs,
     },
+    outputSchema: pageOutputSchema,
     handler: async (args, ctx, extra) => {
       const payload = await ctx.client.request({
         method: 'GET',

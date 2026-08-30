@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { keyMode } from '../config.js';
 import { SERVER_VERSION } from '../version.js';
 import type { ToolDefinition } from './shared.js';
@@ -19,6 +20,14 @@ export function environmentTools(toolCount: () => number): ToolDefinition[] {
       local: true,
       idempotent: true,
       inputSchema: {},
+      outputSchema: z.object({
+        serverVersion: z.string(),
+        baseUrl: z.string(),
+        environment: z.enum(['production', 'development', 'custom']),
+        keyMode: z.enum(['live', 'test', 'unknown']).describe('Derived from the key prefix; the key itself is never exposed.'),
+        readOnlyMode: z.boolean(),
+        registeredTools: z.number(),
+      }),
       handler: async (_args, ctx) => ({
         data: {
           serverVersion: SERVER_VERSION,
