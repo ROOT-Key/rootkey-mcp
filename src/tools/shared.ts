@@ -31,8 +31,15 @@ export interface ToolOutput {
   links?: ToolResourceLink[];
 }
 
+/**
+ * Reports progress back to the client, but only when the client asked for it by sending a
+ * progressToken. When it did not, this is a no-op and nothing goes on the wire.
+ */
+export type ReportProgress = (progress: number, total: number | undefined, message: string) => Promise<void>;
+
 export interface HandlerExtra {
   signal?: AbortSignal | undefined;
+  reportProgress: ReportProgress;
 }
 
 export interface ToolDefinition {
@@ -86,9 +93,12 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
           openWorldHint: definition.local !== true,
         },
       },
-      async (args: Record<string, unknown>, extra: { signal?: AbortSignal }): Promise<CallToolResult> => {
+      async (args: Record<string, unknown>, extra: SdkExtra): Promise<CallToolResult> => {
         try {
-          const output = await definition.handler(args ?? {}, ctx, { signal: extra?.signal });
+          const output = await definition.handler(args ?? {}, ctx, {
+            signal: extra?.signal,
+            reportProgress: progressReporter(extra),
+          });
           return toolSuccess(output, definition.outputSchema !== undefined);
         } catch (error) {
           return toolFailure(definition.name, error);
@@ -109,6 +119,38 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
  * `structuredContent` carries the same value where the tool declares an output schema; the text block
  * stays regardless, because the spec asks for it as the backwards-compatible half.
  */
+interface SdkExtra {
+  signal?: AbortSignal;
+  _meta?: { progressToken?: string | number } | undefined;
+  sendNotification?: (notification: {
+    method: 'notifications/progress';
+    params: { progressToken: string | number; progress: number; total?: number; message?: string };
+  }) => Promise<void>;
+}
+
+/**
+ * A transfer can run for minutes against ROOTKEY_TRANSFER_TIMEOUT_MS, during which a silent server is
+ * indistinguishable from a hung one. Progress is only meaningful if the client opted in, so without a
+ * progressToken this returns a function that does nothing rather than inventing traffic.
+ */
+function progressReporter(extra: SdkExtra | undefined): ReportProgress {
+  const token = extra?._meta?.progressToken;
+  const send = extra?.sendNotification;
+  if (token === undefined || send === undefined) return async () => undefined;
+
+  return async (progress, total, message) => {
+    try {
+      await send({
+        method: 'notifications/progress',
+        params: { progressToken: token, progress, ...(total === undefined ? {} : { total }), message },
+      });
+    } catch (error) {
+      // Progress is a courtesy. A client that closed the stream must not fail the transfer.
+      log.debug(`progress notification dropped: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+}
+
 function toolSuccess(output: ToolOutput, structured: boolean): CallToolResult {
   const content: CallToolResult['content'] = [];
   if (output.notice) content.push({ type: 'text', text: output.notice });

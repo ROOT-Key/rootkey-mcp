@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { ProgressNotificationSchema, type CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectTestClient, payloadOf, stubFetch, testConfig, textOf, type FetchStub } from './helpers.js';
 
@@ -658,6 +658,83 @@ describe('downloads', () => {
         expect(textOf(result)).not.toContain('file-contents');
       },
     );
+  });
+});
+
+describe('progress', () => {
+  it('reports download progress when the client sends a progressToken', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+    const seen: Array<{ progress: number; total?: number; message?: string }> = [];
+
+    const stub = stubFetch([{ text: 'twelve-bytes', headers: { 'content-length': '12' } }]);
+    const { client, close } = await connectTestClient();
+    client.setNotificationHandler(ProgressNotificationSchema, (notification) => {
+      seen.push(notification.params);
+    });
+
+    try {
+      await client.callTool({
+        name: 'download_file',
+        arguments: { fileId: 'f1', outputPath: dir },
+        _meta: { progressToken: 'tok-1' },
+      });
+
+      expect(stub.calls).toHaveLength(1);
+      expect(seen.length).toBeGreaterThan(0);
+      expect(seen.at(-1)?.progress).toBe(12);
+      expect(seen.at(-1)?.total).toBe(12);
+      expect(seen.at(-1)?.message).toBe('Downloading');
+    } finally {
+      await close();
+    }
+  });
+
+  it('reports the upload phases, since fetch cannot observe the bytes', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-upload-'));
+    const filePath = path.join(dir, 'a.txt');
+    await writeFile(filePath, 'x');
+    const messages: string[] = [];
+
+    stubFetch([
+      { json: { chainId: 137, transactionHash: '0xhash' } },
+      { json: { chainId: 137, files: page([]) } },
+    ]);
+    const { client, close } = await connectTestClient();
+    client.setNotificationHandler(ProgressNotificationSchema, (notification) => {
+      messages.push(String(notification.params.message));
+    });
+
+    try {
+      await client.callTool({
+        name: 'upload_file',
+        arguments: { filePath, vaultAddress: VAULT },
+        _meta: { progressToken: 'tok-2' },
+      });
+
+      expect(messages[0]).toContain('Uploading');
+      expect(messages).toContain('Done');
+    } finally {
+      await close();
+    }
+  });
+
+  // Silence is the correct behaviour when nobody asked: progress is opt-in per the spec.
+  it('sends nothing when the client did not ask for progress', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+    const seen: unknown[] = [];
+
+    stubFetch([{ text: 'bytes', headers: { 'content-length': '5' } }]);
+    const { client, close } = await connectTestClient();
+    client.setNotificationHandler(ProgressNotificationSchema, (notification) => {
+      seen.push(notification);
+    });
+
+    try {
+      await client.callTool({ name: 'download_file', arguments: { fileId: 'f1', outputPath: dir } });
+      expect(seen).toHaveLength(0);
+    } finally {
+      await close();
+    }
   });
 });
 

@@ -21,6 +21,9 @@ import {
 
 const fileIdArg = z.string().min(1).describe('File id, as returned by list_files.');
 
+/** send -> resolve id -> done. Coarse on purpose; see the note at the upload call site. */
+const UPLOAD_PHASES = 2;
+
 /** Absent on the row means "cannot tell", which must not disqualify an otherwise exact match. */
 function sizeMatches(item: FileSummary, sizeBytes: number): boolean {
   const reported = item.sizeBytes;
@@ -127,6 +130,10 @@ export const fileTools: ToolDefinition[] = [
         ctx.config.allowedRoots,
       );
 
+      // Byte-level upload progress is not observable through fetch, so the phases are reported
+      // instead of a fake percentage: the useful signal is "still working", not a number.
+      await extra.reportProgress(0, UPLOAD_PHASES, `Uploading ${fileName} (${sizeBytes} bytes)`);
+
       const receipt = await ctx.client.request<CreateSmartContractResponse>({
         method: 'POST',
         path: 'platform/files',
@@ -134,7 +141,9 @@ export const fileTools: ToolDefinition[] = [
         signal: extra.signal,
       });
 
+      await extra.reportProgress(1, UPLOAD_PHASES, 'Uploaded, resolving the new file id');
       const file = await findUploadedFile(ctx, 'platform/files', vaultAddress, fileName, sizeBytes, extra.signal);
+      await extra.reportProgress(UPLOAD_PHASES, UPLOAD_PHASES, 'Done');
 
       return {
         notice: file
@@ -198,6 +207,7 @@ export const fileTools: ToolDefinition[] = [
         downloadDir: ctx.config.downloadDir,
         fallbackName: `rootkey-file-${fileId}`,
         confineTo: await readOnlyWriteRoot(ctx),
+        onProgress: (bytes, total) => void extra.reportProgress(bytes, total, 'Downloading'),
       });
 
       return {
@@ -281,6 +291,8 @@ export const fileTools: ToolDefinition[] = [
       );
 
       const versionsPath = `platform/files/${encodeURIComponent(parentId)}/versions`;
+      await extra.reportProgress(0, UPLOAD_PHASES, `Uploading ${fileName} (${sizeBytes} bytes)`);
+
       const receipt = await ctx.client.request<CreateSmartContractResponse>({
         method: 'POST',
         path: versionsPath,
@@ -288,7 +300,9 @@ export const fileTools: ToolDefinition[] = [
         signal: extra.signal,
       });
 
+      await extra.reportProgress(1, UPLOAD_PHASES, 'Uploaded, resolving the new version id');
       const version = await findUploadedFile(ctx, versionsPath, vaultAddress, fileName, sizeBytes, extra.signal);
+      await extra.reportProgress(UPLOAD_PHASES, UPLOAD_PHASES, 'Done');
 
       return {
         notice: version

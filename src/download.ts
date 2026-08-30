@@ -21,6 +21,8 @@ export interface SaveOptions {
   downloadDir?: string | undefined;
   /** Used when the response carries no usable Content-Disposition filename. */
   fallbackName: string;
+  /** Called as bytes land. `total` is undefined when the response carries no Content-Length. */
+  onProgress?: ((bytes: number, total: number | undefined) => void) | undefined;
   /**
    * When set, the resolved target must land inside this directory. Read-only mode sets it: a mode
    * that promises to change nothing must not let a caller-supplied outputPath drop a file anywhere
@@ -39,7 +41,21 @@ export async function saveResponseToFile(response: Response, options: SaveOption
   const target = await resolveTarget(options, suggested ?? options.fallbackName);
 
   await mkdir(path.dirname(target), { recursive: true });
-  await pipeline(Readable.fromWeb(response.body as ReadableStream), createWriteStream(target));
+
+  const declared = Number(response.headers.get('content-length'));
+  const total = Number.isFinite(declared) && declared > 0 ? declared : undefined;
+  const source = Readable.fromWeb(response.body as ReadableStream);
+
+  if (options.onProgress) {
+    let seen = 0;
+    const report = options.onProgress;
+    source.on('data', (chunk: Buffer) => {
+      seen += chunk.length;
+      report(seen, total);
+    });
+  }
+
+  await pipeline(source, createWriteStream(target));
 
   const { size } = await stat(target);
   return { savedPath: target, sizeBytes: size, fileName: path.basename(target) };
