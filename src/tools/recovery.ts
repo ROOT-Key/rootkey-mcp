@@ -171,6 +171,13 @@ export const recoveryTools: ToolDefinition[] = [
       return {
         notice: 'Encrypted archive saved. Decrypting it needs the one-time password from create_recovery_point.',
         data: saved,
+        links: [
+          {
+            path: saved.savedPath,
+            description: `Encrypted ROOTKey recovery point ${id}. Needs its one-time password to open.`,
+            mimeType: 'application/octet-stream',
+          },
+        ],
       };
     },
   },

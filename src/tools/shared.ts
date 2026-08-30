@@ -1,6 +1,7 @@
 import { openAsBlob } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -16,10 +17,18 @@ export interface ToolContext {
   config: Config;
 }
 
+/** A file this tool put on disk, surfaced as something the client can open rather than only a string. */
+export interface ToolResourceLink {
+  path: string;
+  description: string;
+  mimeType?: string | undefined;
+}
+
 /** What a handler hands back: `notice` is prose shown before the JSON payload. */
 export interface ToolOutput {
   notice?: string;
   data: unknown;
+  links?: ToolResourceLink[];
 }
 
 export interface HandlerExtra {
@@ -103,6 +112,19 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
 function toolSuccess(output: ToolOutput, structured: boolean): CallToolResult {
   const content: CallToolResult['content'] = [];
   if (output.notice) content.push({ type: 'text', text: output.notice });
+
+  // A saved file is a resource, not a sentence about a resource: a client that knows how to open a
+  // file:// link can offer that, instead of leaving the user to copy a path out of a JSON blob.
+  for (const link of output.links ?? []) {
+    content.push({
+      type: 'resource_link',
+      uri: pathToFileURL(link.path).href,
+      name: path.basename(link.path),
+      description: link.description,
+      ...(link.mimeType ? { mimeType: link.mimeType } : {}),
+    });
+  }
+
   content.push({ type: 'text', text: JSON.stringify(output.data ?? null) });
 
   if (!structured) return { content };

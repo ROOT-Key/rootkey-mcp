@@ -661,6 +661,28 @@ describe('downloads', () => {
   });
 });
 
+describe('resource links', () => {
+  it('returns the saved file as a resource_link, not only as a path in JSON', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+
+    await withClient([{ text: 'file-bytes' }], async (call) => {
+      const result = await call('download_file', { fileId: 'f1', outputPath: dir });
+
+      const link = result.content.find((part) => part.type === 'resource_link') as
+        | { type: 'resource_link'; uri: string; name: string; description: string }
+        | undefined;
+
+      expect(link).toBeDefined();
+      expect(link?.uri.startsWith('file://')).toBe(true);
+      expect(decodeURIComponent(link!.uri)).toContain(link!.name);
+      expect(link?.description).toContain('f1');
+
+      // The JSON payload is still the last text block, so existing consumers are unaffected.
+      expect((payloadOf(result) as { savedPath: string }).savedPath).toContain(dir);
+    });
+  });
+});
+
 describe('error surfacing', () => {
   it('turns an API error envelope into a readable tool error', async () => {
     await withClient(

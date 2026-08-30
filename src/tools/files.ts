@@ -200,7 +200,10 @@ export const fileTools: ToolDefinition[] = [
         confineTo: await readOnlyWriteRoot(ctx),
       });
 
-      return { data: saved };
+      return {
+        data: saved,
+        links: [{ path: saved.savedPath, description: `Downloaded from ROOTKey file ${fileId}.` }],
+      };
     },
   },
 
