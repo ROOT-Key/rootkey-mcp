@@ -382,7 +382,9 @@ describe('uploads', () => {
     );
   });
 
-  it('sends the validation method, defaulting to hash', async () => {
+  // `method` is required by the endpoint but the API ignores it and always performs a SHA-256 hash
+  // comparison, so it is sent as a constant rather than exposed as a choice the model has to make.
+  it('always sends method=hash and does not accept a method argument', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-validate-'));
     const filePath = path.join(dir, 'a.txt');
     await writeFile(filePath, 'x');
@@ -394,6 +396,15 @@ describe('uploads', () => {
         const form = stub.calls[0]!.body as FormData;
         expect(form.get('method')).toBe('hash');
         expect(form.get('ownerVault')).toBe(VAULT);
+
+        const rejected = await call('validate_file', {
+          fileId: 'f1',
+          filePath,
+          vaultAddress: VAULT,
+          method: 'signature',
+        });
+        expect(rejected.isError).toBe(true);
+        expect(textOf(rejected)).toContain('method');
       },
     );
   });

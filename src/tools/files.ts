@@ -277,18 +277,20 @@ export const fileTools: ToolDefinition[] = [
     name: 'validate_file',
     title: 'Validate a file against its anchor',
     description:
-      'Check a local copy of a file against what was anchored. Returns ownership, integrity and validity ' +
-      'verdicts. Each call is recorded in the validation history and consumes plan quota, so it is not a read.',
+      'Check a local copy of a file against what was anchored, by comparing SHA-256 hashes. Returns ' +
+      'ownership, integrity and validity verdicts. Each call is recorded in the validation history and ' +
+      'consumes plan quota, so it is not a read.',
     inputSchema: {
       fileId: fileIdArg,
       filePath: z.string().min(1).describe('Absolute path to the local copy to verify.'),
       vaultAddress: vaultAddressArg,
-      method: z.string().optional().describe('Validation method. Defaults to "hash".'),
     },
     handler: async (args, ctx, extra) => {
       const { form } = await buildFileForm(requireString(args, 'filePath'), {
         ownerVault: requireString(args, 'vaultAddress'),
-        method: optionalString(args, 'method') ?? 'hash',
+        // Required by the endpoint, but the API branches on nothing and always answers
+        // "SHA-256 Hash Comparison". Sent as a constant rather than offered as a choice.
+        method: 'hash',
       });
 
       const data = await ctx.client.request({
