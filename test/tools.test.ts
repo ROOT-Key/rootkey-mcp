@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -114,10 +114,98 @@ describe('tool registration', () => {
       expect(byName.get('get_environment_info')?.annotations?.openWorldHint).toBe(false);
       expect(byName.get('list_files')?.annotations?.openWorldHint).toBe(true);
 
+      // A download changes nothing in the workspace, so it survives read-only mode - but it does write
+      // a file, so it cannot claim readOnlyHint. The two questions are separate and answered separately.
+      expect(byName.get('download_file')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('download_recovery_point')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('get_file')?.annotations?.readOnlyHint).toBe(true);
+
       for (const tool of tools) {
         expect(tool.description, `${tool.name} needs a description`).toBeTruthy();
         expect(tool.annotations?.title, `${tool.name} needs a title`).toBeTruthy();
       }
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe('read-only mode', () => {
+  it('still serves the downloads, because they change nothing in the workspace', async () => {
+    const { client, close } = await connectTestClient(testConfig({ readOnly: true }));
+    try {
+      const names = (await client.listTools()).tools.map((tool) => tool.name);
+      expect(names).toContain('download_file');
+      expect(names).toContain('download_recovery_point');
+      expect(names).not.toContain('upload_file');
+    } finally {
+      await close();
+    }
+  });
+
+  it('refuses a download aimed outside the download directory', async () => {
+    const downloadDir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+    const elsewhere = await mkdtemp(path.join(tmpdir(), 'rootkey-elsewhere-'));
+
+    await withClient(
+      [{ text: 'file-bytes' }],
+      async (call) => {
+        const result = await call('download_file', {
+          fileId: 'f1',
+          outputPath: path.join(elsewhere, 'exfiltrated.bin'),
+        });
+
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('read-only mode');
+      },
+      testConfig({ readOnly: true, downloadDir }),
+    );
+  });
+
+  it('still saves a download that lands inside the download directory', async () => {
+    const downloadDir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+
+    await withClient(
+      [{ text: 'file-bytes' }],
+      async (call) => {
+        const result = await call('download_file', { fileId: 'f1' });
+        expect(result.isError).toBeFalsy();
+        expect((payloadOf(result) as { savedPath: string }).savedPath).toContain(downloadDir);
+      },
+      testConfig({ readOnly: true, downloadDir }),
+    );
+  });
+});
+
+describe('input schemas', () => {
+  it('publishes additionalProperties: false, including for the no-argument tools', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+
+      for (const tool of tools) {
+        expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
+      }
+
+      const local = tools.find((tool) => tool.name === 'get_environment_info');
+      expect(local?.inputSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
+    } finally {
+      await close();
+    }
+  });
+
+  // Surfaced as a tool execution error rather than a JSON-RPC protocol error, which is the shape the
+  // spec says clients should hand back to the model so it can self-correct.
+  it('names the offending key when an unknown argument is passed', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const result = (await client.callTool({
+        name: 'get_environment_info',
+        arguments: { bogus: 1 },
+      })) as CallToolResult;
+
+      expect(result.isError).toBe(true);
+      expect(textOf(result)).toContain("Unrecognized key(s) in object: 'bogus'");
     } finally {
       await close();
     }
@@ -201,6 +289,47 @@ describe('argument validation', () => {
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain('at least one field');
     });
+  });
+
+  /**
+   * The path an upload reads can be chosen by the model, and the model reads documents other people
+   * wrote. This asserts the refusal happens before the file ever reaches the wire.
+   */
+  it('refuses to upload from outside the allowed roots, without calling the API', async () => {
+    const allowed = await mkdtemp(path.join(tmpdir(), 'rootkey-allowed-'));
+    const elsewhere = await mkdtemp(path.join(tmpdir(), 'rootkey-elsewhere-'));
+    const filePath = path.join(elsewhere, 'secret.txt');
+    await writeFile(filePath, 'x');
+
+    await withClient(
+      [{ json: {} }],
+      async (call, stub) => {
+        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('ROOTKEY_ALLOWED_DIRS');
+        expect(stub.calls).toHaveLength(0);
+      },
+      testConfig({ allowedRoots: [allowed] }),
+    );
+  });
+
+  it('refuses to upload from a hidden directory inside an allowed root', async () => {
+    const allowed = await mkdtemp(path.join(tmpdir(), 'rootkey-allowed-'));
+    const hidden = path.join(allowed, '.ssh');
+    await mkdir(hidden);
+    const filePath = path.join(hidden, 'id_rsa');
+    await writeFile(filePath, 'x');
+
+    await withClient(
+      [{ json: {} }],
+      async (call, stub) => {
+        const result = await call('validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('hidden directory');
+        expect(stub.calls).toHaveLength(0);
+      },
+      testConfig({ allowedRoots: [allowed] }),
+    );
   });
 
   it('reports a missing upload file without calling the API', async () => {
@@ -347,7 +476,9 @@ describe('uploads', () => {
     );
   });
 
-  it('sends the validation method, defaulting to hash', async () => {
+  // `method` is required by the endpoint but the API ignores it and always performs a SHA-256 hash
+  // comparison, so it is sent as a constant rather than exposed as a choice the model has to make.
+  it('always sends method=hash and does not accept a method argument', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-validate-'));
     const filePath = path.join(dir, 'a.txt');
     await writeFile(filePath, 'x');
@@ -359,6 +490,15 @@ describe('uploads', () => {
         const form = stub.calls[0]!.body as FormData;
         expect(form.get('method')).toBe('hash');
         expect(form.get('ownerVault')).toBe(VAULT);
+
+        const rejected = await call('validate_file', {
+          fileId: 'f1',
+          filePath,
+          vaultAddress: VAULT,
+          method: 'signature',
+        });
+        expect(rejected.isError).toBe(true);
+        expect(textOf(rejected)).toContain('method');
       },
     );
   });

@@ -6,6 +6,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { Config } from '../config.js';
 import { ApiError, NetworkError, ToolInputError } from '../errors.js';
+import { resolveDownloadDirectory } from '../download.js';
+import { assertReadableFile } from '../paths.js';
 import type { RootKeyClient } from '../http.js';
 import { log } from '../log.js';
 
@@ -29,8 +31,15 @@ export interface ToolDefinition {
   title: string;
   description: string;
   inputSchema: z.ZodRawShape;
-  /** Registered when the server runs in read-only mode. */
+  /** Registered when the server runs in read-only mode: the tool changes nothing in the workspace. */
   readOnly?: boolean;
+  /**
+   * Reads nothing from the workspace but writes a file to the local disk. Kept apart from `readOnly`
+   * because the two answer different questions: whether the tool may run in read-only mode, and
+   * whether `readOnlyHint` may claim it modifies nothing. A download is yes to the first, no to the
+   * second.
+   */
+  writesLocalFiles?: boolean;
   destructive?: boolean;
   idempotent?: boolean;
   /** Local-only tools do not talk to the API. */
@@ -49,10 +58,13 @@ export function registerTools(server: McpServer, ctx: ToolContext, definitions: 
       {
         title: definition.title,
         description: definition.description,
-        inputSchema: definition.inputSchema,
+        // `.strict()` rather than the raw shape: it emits `additionalProperties: false`, which is the
+        // form the spec recommends for a no-argument tool, and it turns a hallucinated or misspelled
+        // argument into an error the model can read and correct instead of a value silently dropped.
+        inputSchema: z.object(definition.inputSchema).strict(),
         annotations: {
           title: definition.title,
-          readOnlyHint: definition.readOnly === true,
+          readOnlyHint: definition.readOnly === true && definition.writesLocalFiles !== true,
           destructiveHint: definition.destructive === true,
           idempotentHint: definition.idempotent === true,
           openWorldHint: definition.local !== true,
@@ -148,6 +160,16 @@ export function optionalString(args: Record<string, unknown>, key: string): stri
   return value.trim();
 }
 
+/**
+ * Read-only mode promises the server changes nothing. It cannot promise that about the API and the
+ * disk at once unless downloads are pinned somewhere predictable, so in that mode a caller-supplied
+ * outputPath may not leave the download directory. Outside it, undefined: no confinement.
+ */
+export async function readOnlyWriteRoot(ctx: ToolContext): Promise<string | undefined> {
+  if (!ctx.config.readOnly) return undefined;
+  return resolveDownloadDirectory(ctx.config.downloadDir);
+}
+
 /* ------------------------------------------------------------------ *
  * Multipart uploads
  * ------------------------------------------------------------------ */
@@ -160,8 +182,9 @@ export function optionalString(args: Record<string, unknown>, key: string): stri
 export async function buildFileForm(
   filePath: string,
   fields: Record<string, string | undefined>,
+  allowedRoots: string[],
 ): Promise<{ form: FormData; fileName: string; sizeBytes: number }> {
-  const resolved = path.resolve(filePath);
+  const resolved = await assertReadableFile(filePath, allowedRoots);
 
   let info;
   try {

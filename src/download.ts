@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream } from 'node:stream/web';
 import { ToolInputError } from './errors.js';
+import { assertWithinDirectory } from './paths.js';
 
 export interface SaveResult {
   savedPath: string;
@@ -20,6 +21,12 @@ export interface SaveOptions {
   downloadDir?: string | undefined;
   /** Used when the response carries no usable Content-Disposition filename. */
   fallbackName: string;
+  /**
+   * When set, the resolved target must land inside this directory. Read-only mode sets it: a mode
+   * that promises to change nothing must not let a caller-supplied outputPath drop a file anywhere
+   * on the disk.
+   */
+  confineTo?: string | undefined;
 }
 
 /** Streams a response body straight to disk - nothing is buffered and nothing is inlined into chat. */
@@ -40,16 +47,29 @@ export async function saveResponseToFile(response: Response, options: SaveOption
 
 async function resolveTarget(options: SaveOptions, derivedName: string): Promise<string> {
   const safeName = sanitizeFileName(derivedName);
+  const chosen = await chooseTarget(options, safeName);
 
-  if (options.outputPath && options.outputPath.trim() !== '') {
-    const resolved = path.resolve(options.outputPath);
-    if (await isDirectory(resolved)) return dedupe(path.join(resolved, safeName));
-    // A trailing separator means the caller meant a directory even if it does not exist yet.
-    if (/[\\/]$/.test(options.outputPath)) return dedupe(path.join(resolved, safeName));
-    return dedupe(resolved);
+  if (options.confineTo) {
+    await assertWithinDirectory(chosen, options.confineTo, 'the downloaded file');
   }
 
-  return dedupe(path.join(await defaultDirectory(options.downloadDir), safeName));
+  return dedupe(chosen);
+}
+
+async function chooseTarget(options: SaveOptions, safeName: string): Promise<string> {
+  if (options.outputPath && options.outputPath.trim() !== '') {
+    const resolved = path.resolve(options.outputPath);
+    if (await isDirectory(resolved)) return path.join(resolved, safeName);
+    // A trailing separator means the caller meant a directory even if it does not exist yet.
+    if (/[\\/]$/.test(options.outputPath)) return path.join(resolved, safeName);
+    return resolved;
+  }
+
+  return path.join(await defaultDirectory(options.downloadDir), safeName);
+}
+
+export async function resolveDownloadDirectory(configured: string | undefined): Promise<string> {
+  return defaultDirectory(configured);
 }
 
 async function defaultDirectory(configured: string | undefined): Promise<string> {
