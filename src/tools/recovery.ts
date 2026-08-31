@@ -166,6 +166,7 @@ export const recoveryTools: ToolDefinition[] = [
         downloadDir: ctx.config.downloadDir,
         fallbackName: `rootkey-recovery-point-${id}.zip`,
         confineTo: await readOnlyWriteRoot(ctx),
+        onProgress: (bytes, total) => void extra.reportProgress(bytes, total, 'Downloading archive'),
       });
 
       return {
