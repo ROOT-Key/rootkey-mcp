@@ -279,6 +279,74 @@ describe('uploads', () => {
     );
   });
 
+  /**
+   * The API's `name` filter is `contains`, case-insensitive, so the rows that come back are candidates
+   * rather than answers. The id we pick is handed to the model and ends up in get_file and delete_file,
+   * so these three pin down that a near-miss is reported as "not found" instead of as a file.
+   */
+  it('never reports a same-named file of a different size as the one just uploaded', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-upload-'));
+    const filePath = path.join(dir, 'report.pdf');
+    await writeFile(filePath, 'nine-byte');
+
+    await withClient(
+      [
+        { json: { chainId: 137, transactionHash: '0xhash' } },
+        { json: { chainId: 137, files: page([{ id: 'older', name: 'report.pdf', sizeBytes: 4096 }]) } },
+      ],
+      async (call) => {
+        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+
+        expect(result.isError).toBeFalsy();
+        expect((payloadOf(result) as { file: unknown }).file).toBeNull();
+        expect(textOf(result)).toContain('list_files');
+      },
+    );
+  });
+
+  it('never reports a merely name-containing neighbour as the one just uploaded', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-upload-'));
+    const filePath = path.join(dir, 'report.pdf');
+    await writeFile(filePath, 'x');
+
+    await withClient(
+      [
+        { json: { chainId: 137, transactionHash: '0xhash' } },
+        { json: { chainId: 137, files: page([{ id: 'neighbour', name: 'report.pdf.bak', sizeBytes: 1 }]) } },
+      ],
+      async (call) => {
+        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        expect((payloadOf(result) as { file: unknown }).file).toBeNull();
+      },
+    );
+  });
+
+  it('accepts an exact name and size match, and tolerates a row that omits the size', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-upload-'));
+    const filePath = path.join(dir, 'report.pdf');
+    await writeFile(filePath, 'nine-byte');
+
+    await withClient(
+      [
+        { json: { chainId: 137, transactionHash: '0xhash' } },
+        {
+          json: {
+            chainId: 137,
+            files: page([
+              { id: 'no-size', name: 'report.pdf' },
+              { id: 'exact', name: 'report.pdf', sizeBytes: 9 },
+            ]),
+          },
+        },
+      ],
+      async (call) => {
+        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        // Newest first: a row that does not report a size cannot be ruled out, so it wins.
+        expect((payloadOf(result) as { file: { id: string } }).file.id).toBe('no-size');
+      },
+    );
+  });
+
   it('sends the validation method, defaulting to hash', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-validate-'));
     const filePath = path.join(dir, 'a.txt');
