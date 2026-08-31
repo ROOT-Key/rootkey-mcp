@@ -28,11 +28,11 @@ describe('stdio end to end', () => {
     if (!existsSync(BUNDLE)) throw new Error(`Build first: ${BUNDLE} does not exist (npm run build).`);
   });
 
-  it('completes the MCP handshake and advertises 26 tools', async () => {
+  it('completes the MCP handshake and advertises 27 tools', async () => {
     const { client, close } = await connect({ ROOTKEY_API_KEY: 'rk_test_e2e' });
     try {
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(26);
+      expect(tools).toHaveLength(27);
       expect(tools.map((tool) => tool.name)).toContain('upload_file');
 
       // The instructions are how Claude learns the API's missing pieces.
@@ -44,11 +44,11 @@ describe('stdio end to end', () => {
     }
   });
 
-  it('serves 14 tools in read-only mode', async () => {
+  it('serves 15 tools in read-only mode', async () => {
     const { client, close } = await connect({ ROOTKEY_API_KEY: 'rk_test_e2e', ROOTKEY_READ_ONLY: 'true' });
     try {
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(14);
+      expect(tools).toHaveLength(15);
       expect(tools.map((tool) => tool.name)).not.toContain('delete_vault');
     } finally {
       await close();
@@ -68,7 +68,7 @@ describe('stdio end to end', () => {
       expect(payload.environment).toBe('development');
       expect(payload.baseUrl).toBe('https://dev-api.rootkey.ai/api-v1/');
       expect(payload.keyMode).toBe('test');
-      expect(payload.registeredTools).toBe(26);
+      expect(payload.registeredTools).toBe(27);
     } finally {
       await close();
     }

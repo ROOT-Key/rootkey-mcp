@@ -31,6 +31,7 @@ const EXPECTED_TOOLS = [
   'list_recovery_points',
   'create_recovery_point',
   'get_recovery_point',
+  'wait_for_recovery_point',
   'download_recovery_point',
   'delete_recovery_point',
   'get_environment_info',
@@ -49,6 +50,7 @@ const READ_ONLY_TOOLS = [
   'get_record_validations',
   'list_recovery_points',
   'get_recovery_point',
+  'wait_for_recovery_point',
   'download_recovery_point',
   'get_environment_info',
 ];
@@ -82,7 +84,7 @@ describe('tool registration', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
-      expect(tools).toHaveLength(26);
+      expect(tools).toHaveLength(27);
     } finally {
       await close();
     }
@@ -93,7 +95,7 @@ describe('tool registration', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_ONLY_TOOLS].sort());
-      expect(tools).toHaveLength(14);
+      expect(tools).toHaveLength(15);
     } finally {
       await close();
     }
@@ -597,6 +599,57 @@ describe('records', () => {
   });
 });
 
+describe('wait_for_recovery_point', () => {
+  it('polls until the archive reaches a terminal state and reports it is downloadable', async () => {
+    await withClient(
+      [
+        { json: { recoveryPoint: { id: 'rp1', status: 'processing', progress: 40 } } },
+        { json: { recoveryPoint: { id: 'rp1', status: 'completed', progress: 100 } } },
+      ],
+      async (call, stub) => {
+        const result = await call('wait_for_recovery_point', {
+          recoveryPointId: 'rp1',
+          pollIntervalSeconds: 1,
+          timeoutSeconds: 30,
+        });
+
+        expect(stub.calls.length).toBeGreaterThanOrEqual(2);
+        const payload = payloadOf(result) as { status: string; timedOut: boolean };
+        expect(payload.status).toBe('completed');
+        expect(payload.timedOut).toBe(false);
+        expect(textOf(result)).toContain('download_recovery_point');
+      },
+    );
+  });
+
+  it('stops on a failed archive rather than waiting out the timeout', async () => {
+    await withClient([{ json: { recoveryPoint: { id: 'rp1', status: 'failed' } } }], async (call, stub) => {
+      const result = await call('wait_for_recovery_point', { recoveryPointId: 'rp1', timeoutSeconds: 300 });
+
+      expect(stub.calls).toHaveLength(1);
+      expect((payloadOf(result) as { timedOut: boolean }).timedOut).toBe(false);
+      expect(textOf(result)).toContain('cannot be downloaded');
+    });
+  });
+
+  // Timing out is a normal outcome, not an error: the archive is fine, the wait simply ran out.
+  it('returns timedOut rather than an error when the archive is still building', async () => {
+    await withClient([{ json: { recoveryPoint: { id: 'rp1', status: 'processing' } } }], async (call) => {
+      const result = await call('wait_for_recovery_point', {
+        recoveryPointId: 'rp1',
+        timeoutSeconds: 5,
+        pollIntervalSeconds: 60,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = payloadOf(result) as { timedOut: boolean; status: string };
+      expect(payload.timedOut).toBe(true);
+      expect(payload.status).toBe('processing');
+      expect(textOf(result)).toContain('call wait_for_recovery_point again');
+    });
+  });
+});
+
 describe('recovery points', () => {
   it('headlines the one-time password and keeps it out of the logs', async () => {
     await withClient(
@@ -796,7 +849,7 @@ describe('get_environment_info', () => {
 
       expect(payload.keyMode).toBe('test');
       expect(payload.environment).toBe('production');
-      expect(payload.registeredTools).toBe(26);
+      expect(payload.registeredTools).toBe(27);
       expect(payload.readOnlyMode).toBe(false);
       expect(JSON.stringify(payload)).not.toContain('rk_test_unit');
     } finally {

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
 import { saveResponseToFile } from '../download.js';
 import { ToolInputError } from '../errors.js';
@@ -15,6 +16,11 @@ import {
 } from './shared.js';
 
 const recoveryPointIdArg = z.string().min(1).describe('Recovery point id, from list_recovery_points.');
+
+const DEFAULT_WAIT_SECONDS = 300;
+const MAX_WAIT_SECONDS = 1800;
+const DEFAULT_POLL_SECONDS = 5;
+const TERMINAL_STATUSES = new Set(['completed', 'failed']);
 
 /** The create call returns only the password, so the new archive is located by name afterwards. */
 async function findCreatedRecoveryPoint(
@@ -132,6 +138,86 @@ export const recoveryTools: ToolDefinition[] = [
         signal: extra.signal,
       });
       return { data: unwrap(payload, 'recoveryPoint') };
+    },
+  },
+
+  {
+    name: 'wait_for_recovery_point',
+    title: 'Wait for a recovery point to finish building',
+    description:
+      'Poll a recovery point until it reports "completed" or "failed", then return it. Use this instead ' +
+      'of calling get_recovery_point in a loop: an archive can take minutes, and every manual poll costs ' +
+      'a full round trip through the conversation. Reports progress while it waits. If it returns with ' +
+      'timedOut true the archive is still building and the recovery point is fine - call this again.',
+    readOnly: true,
+    idempotent: true,
+    inputSchema: {
+      recoveryPointId: recoveryPointIdArg,
+      timeoutSeconds: z
+        .number()
+        .int()
+        .min(5)
+        .max(MAX_WAIT_SECONDS)
+        .optional()
+        .describe(`How long to keep waiting. Defaults to ${DEFAULT_WAIT_SECONDS}s. Your client may time the tool call out sooner.`),
+      pollIntervalSeconds: z
+        .number()
+        .int()
+        .min(1)
+        .max(60)
+        .optional()
+        .describe(`Seconds between checks. Defaults to ${DEFAULT_POLL_SECONDS}s.`),
+    },
+    outputSchema: z
+      .object({
+        status: z.string().nullable().describe('The last status seen: enqueued, processing, completed or failed.'),
+        timedOut: z.boolean().describe('True when the wait ran out before the archive reached a final state.'),
+        waitedSeconds: z.number(),
+        recoveryPoint: z.unknown().describe('The recovery point as the API last reported it.'),
+      })
+      .passthrough(),
+    handler: async (args, ctx, extra) => {
+      const id = requireString(args, 'recoveryPointId');
+      const timeoutSeconds = (args.timeoutSeconds as number | undefined) ?? DEFAULT_WAIT_SECONDS;
+      const pollSeconds = (args.pollIntervalSeconds as number | undefined) ?? DEFAULT_POLL_SECONDS;
+      const deadline = Date.now() + timeoutSeconds * 1000;
+
+      let point: RecoveryPoint | null = null;
+      let status: string | null = null;
+
+      for (;;) {
+        const payload = await ctx.client.request({
+          method: 'GET',
+          path: `platform/recovery-point/${encodeURIComponent(id)}`,
+          signal: extra.signal,
+        });
+        point = unwrap(payload, 'recoveryPoint') as RecoveryPoint | null;
+        status = typeof point?.status === 'string' ? point.status : null;
+
+        await extra.reportProgress(
+          typeof point?.progress === 'number' ? point.progress : 0,
+          100,
+          `Recovery point ${status ?? 'unknown'}`,
+        );
+
+        if (status !== null && TERMINAL_STATUSES.has(status.toLowerCase())) break;
+
+        // Stop rather than sleep past the deadline: a wait that overruns is worse than one that reports.
+        if (Date.now() + pollSeconds * 1000 >= deadline) break;
+        await sleep(pollSeconds * 1000, undefined, { signal: extra.signal });
+      }
+
+      const settled = status !== null && TERMINAL_STATUSES.has(status.toLowerCase());
+      const waitedSeconds = Math.max(0, Math.round((timeoutSeconds * 1000 - (deadline - Date.now())) / 1000));
+
+      return {
+        notice: settled
+          ? status?.toLowerCase() === 'completed'
+            ? 'The archive is ready. download_recovery_point can fetch it now.'
+            : `The archive finished in state "${status}". It cannot be downloaded.`
+          : `Still building after ${waitedSeconds}s. Nothing is wrong - call wait_for_recovery_point again.`,
+        data: { status, timedOut: !settled, waitedSeconds, recoveryPoint: point },
+      };
     },
   },
 
