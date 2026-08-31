@@ -212,6 +212,53 @@ describe('input schemas', () => {
   });
 });
 
+describe('structured output', () => {
+  it('declares an output schema on the tools whose payload this server shapes', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+      const withSchema = new Set(tools.filter((tool) => tool.outputSchema).map((tool) => tool.name));
+
+      for (const name of ['list_files', 'list_records', 'get_file_history', 'get_environment_info']) {
+        expect(withSchema.has(name), name).toBe(true);
+      }
+      // Straight API pass-through: a schema here would be a guess about someone else's contract.
+      for (const name of ['get_file', 'create_vault', 'validate_file']) {
+        expect(withSchema.has(name), name).toBe(false);
+      }
+    } finally {
+      await close();
+    }
+  });
+
+  it('returns structuredContent alongside the text block, and keeps the API extras', async () => {
+    await withClient(
+      [{ json: { chainId: 137, files: page([{ id: 'f1', name: 'a.pdf' }]) } }],
+      async (call) => {
+        const result = await call('list_files', { vaultAddress: VAULT });
+        const structured = result.structuredContent as {
+          items: unknown[];
+          chainId: number;
+          pagination: { nextCursor: string | null };
+        };
+
+        expect(structured.items).toHaveLength(1);
+        expect(structured.chainId).toBe(137);
+        expect(structured.pagination.nextCursor).toBeNull();
+        // The serialized copy is still there for clients that do not read structuredContent.
+        expect(payloadOf(result)).toEqual(structured);
+      },
+    );
+  });
+
+  it('serializes compactly, since indentation is tokens nobody reads', async () => {
+    await withClient([{ json: { chainId: 137, files: page([{ id: 'f1' }]) } }], async (call) => {
+      const result = await call('list_files', { vaultAddress: VAULT });
+      expect(textOf(result)).not.toMatch(/\n\s+"/);
+    });
+  });
+});
+
 describe('vault address mapping', () => {
   it('sends vaultAddress as ownerVault when fetching a file', async () => {
     await withClient([{ json: { chainId: 137, file: { id: 'f1' } } }], async (call, stub) => {
@@ -611,6 +658,28 @@ describe('downloads', () => {
         expect(textOf(result)).not.toContain('file-contents');
       },
     );
+  });
+});
+
+describe('resource links', () => {
+  it('returns the saved file as a resource_link, not only as a path in JSON', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
+
+    await withClient([{ text: 'file-bytes' }], async (call) => {
+      const result = await call('download_file', { fileId: 'f1', outputPath: dir });
+
+      const link = result.content.find((part) => part.type === 'resource_link') as
+        | { type: 'resource_link'; uri: string; name: string; description: string }
+        | undefined;
+
+      expect(link).toBeDefined();
+      expect(link?.uri.startsWith('file://')).toBe(true);
+      expect(decodeURIComponent(link!.uri)).toContain(link!.name);
+      expect(link?.description).toContain('f1');
+
+      // The JSON payload is still the last text block, so existing consumers are unaffected.
+      expect((payloadOf(result) as { savedPath: string }).savedPath).toContain(dir);
+    });
   });
 });
 

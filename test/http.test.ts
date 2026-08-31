@@ -189,6 +189,44 @@ describe('retries', () => {
   });
 });
 
+describe('redirects', () => {
+  it('follows a same-origin redirect and keeps sending the API key', async () => {
+    const stub = stubFetch([
+      { status: 302, headers: { location: '/api-v1/platform/files/f1/blob' } },
+      { text: 'file-bytes' },
+    ]);
+
+    const response = await new RootKeyClient(testConfig()).requestBinary({ method: 'GET', path: 'platform/files/f1/download' });
+
+    expect(await response.text()).toBe('file-bytes');
+    expect(stub.calls).toHaveLength(2);
+    expect(stub.calls[1]!.url.pathname).toBe('/api-v1/platform/files/f1/blob');
+    expect(stub.calls[1]!.headers['x-api-key']).toBe('rk_test_unit');
+  });
+
+  // The whole point: a signed-URL style hop must not carry the credential to the CDN.
+  it('drops the API key when a redirect leaves the origin', async () => {
+    const stub = stubFetch([
+      { status: 302, headers: { location: 'https://cdn.example.net/signed/abc' } },
+      { text: 'file-bytes' },
+    ]);
+
+    await new RootKeyClient(testConfig()).requestBinary({ method: 'GET', path: 'platform/files/f1/download' });
+
+    expect(stub.calls[1]!.url.origin).toBe('https://cdn.example.net');
+    expect(stub.calls[1]!.headers['x-api-key']).toBeUndefined();
+    expect(JSON.stringify(stub.calls[1]!.headers)).not.toContain('rk_test_unit');
+  });
+
+  it('gives up rather than looping forever', async () => {
+    stubFetch([{ status: 302, headers: { location: '/api-v1/loop' } }]);
+
+    await expect(new RootKeyClient(testConfig()).request({ method: 'GET', path: 'platform/files' })).rejects.toThrow(
+      /Too many redirects/,
+    );
+  });
+});
+
 describe('parseRetryAfter', () => {
   it('reads a delay in seconds', () => {
     expect(parseRetryAfter('2')).toBe(2000);

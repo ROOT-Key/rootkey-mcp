@@ -56,10 +56,23 @@ export function normalizeBaseUrl(raw: string): string {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new ConfigError(`ROOTKEY_API_URL must be http or https, got "${parsed.protocol}".`);
   }
+  // Every request carries the API key in a header. Plain http puts it on the wire in clear, so it is
+  // allowed only where the wire does not leave the machine.
+  if (parsed.protocol === 'http:' && !isLoopback(parsed.hostname)) {
+    throw new ConfigError(
+      `ROOTKEY_API_URL uses plain http for "${parsed.hostname}", which would send your API key ` +
+        'unencrypted. Use https, or point at localhost if you are running the API on this machine.',
+    );
+  }
   parsed.search = '';
   parsed.hash = '';
   if (!parsed.pathname.endsWith('/')) parsed.pathname += '/';
   return parsed.toString();
+}
+
+function isLoopback(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.endsWith('.localhost');
 }
 
 function resolveEnvironment(baseUrl: string): Environment {
