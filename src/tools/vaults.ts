@@ -68,7 +68,9 @@ export const vaultTools: ToolDefinition[] = [
     name: 'delete_vault',
     title: 'Delete vault',
     description:
-      'Permanently delete a vault. This is irreversible and audited on chain - confirm with the user before calling it.',
+      'Delete a vault and everything inside it. The vault and its files move to the trash: they stop appearing ' +
+      'in every list tool immediately, and stay recoverable from the Restore Center in the ROOTKey dashboard ' +
+      'until the retention policy purges them for good. Confirm with the user before calling it.',
     destructive: true,
     idempotent: true,
     inputSchema: {

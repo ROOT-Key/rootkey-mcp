@@ -176,8 +176,10 @@ export const fileTools: ToolDefinition[] = [
     name: 'delete_file',
     title: 'Delete a file',
     description:
-      'Permanently delete a file. Irreversible and audited on chain - confirm with the user first. ' +
-      'The on-chain proof of past anchors remains valid regardless.',
+      'Delete a file. It moves to the trash: it stops appearing in list_files immediately, and stays ' +
+      'recoverable from the Restore Center in the ROOTKey dashboard until the retention policy purges it ' +
+      'for good. Confirm with the user first. The on-chain anchor is untouched either way - a proof that ' +
+      'was written stays valid forever.',
     destructive: true,
     idempotent: true,
     inputSchema: {

@@ -450,3 +450,59 @@ describe('get_environment_info', () => {
     }
   });
 });
+
+/**
+ * These assertions exist because the descriptions are what the model acts on, and two of them used to
+ * be wrong: records were described as anchored on chain (the API stores and hashes them, but writes no
+ * transaction), and deletes were described as permanent (they are soft, and the Restore Center undoes
+ * them). Both are compliance-shaped claims, so they get a regression test rather than a code comment.
+ */
+describe('description accuracy', () => {
+  it('never claims records are anchored on chain', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+      const createRecord = tools.find((tool) => tool.name === 'create_record');
+
+      expect(createRecord?.description).toContain('NOT anchored on chain');
+      expect(createRecord?.description).not.toMatch(/table and anchor it/i);
+      expect(client.getInstructions() ?? '').toContain('Records are NOT anchored on chain');
+    } finally {
+      await close();
+    }
+  });
+
+  it('describes vault, file and record deletes as recoverable, and recovery point deletes as not', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+      const describe_ = (name: string) => tools.find((tool) => tool.name === name)?.description ?? '';
+
+      for (const name of ['delete_vault', 'delete_file', 'delete_record']) {
+        expect(describe_(name), name).toContain('Restore Center');
+        expect(describe_(name), name).not.toMatch(/permanently delete/i);
+        expect(describe_(name), name).not.toMatch(/audited on chain/i);
+      }
+
+      expect(describe_('delete_recovery_point')).toMatch(/genuinely irreversible/i);
+      expect(describe_('delete_recovery_point')).not.toContain('Restore Center entry for it.\nRecoverable');
+    } finally {
+      await close();
+    }
+  });
+
+  it('keeps every delete tool annotated as destructive regardless of recoverability', async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const { tools } = await client.listTools();
+      const deletes = tools.filter((tool) => tool.name.startsWith('delete_'));
+
+      expect(deletes).toHaveLength(4);
+      for (const tool of deletes) {
+        expect(tool.annotations?.destructiveHint, tool.name).toBe(true);
+      }
+    } finally {
+      await close();
+    }
+  });
+});

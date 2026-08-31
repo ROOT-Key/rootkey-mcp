@@ -168,7 +168,9 @@ export const recoveryTools: ToolDefinition[] = [
     name: 'delete_recovery_point',
     title: 'Delete a recovery point',
     description:
-      'Permanently delete a recovery point and its archive. Irreversible - confirm with the user first.',
+      'Permanently delete a recovery point and the encrypted archive behind it. Unlike deleting a vault, ' +
+      'file or record, this one is genuinely irreversible: the archive is erased from storage and there is ' +
+      'no Restore Center entry for it. Confirm with the user first.',
     destructive: true,
     idempotent: true,
     inputSchema: {
