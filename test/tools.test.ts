@@ -8,49 +8,51 @@ import { connectTestClient, payloadOf, stubFetch, testConfig, textOf, type Fetch
 const VAULT = '0xdf67CA8286510997567685c0385ECeAb11C23C92';
 
 const EXPECTED_TOOLS = [
-  'create_vault',
-  'update_vault',
-  'delete_vault',
-  'list_files',
-  'upload_file',
-  'get_file',
-  'download_file',
-  'delete_file',
-  'list_file_versions',
-  'upload_file_version',
-  'validate_file',
-  'get_file_history',
-  'get_file_validations',
-  'generate_file_audit_report',
-  'list_records',
-  'create_record',
-  'list_record_versions',
-  'get_record_history',
-  'get_record_validations',
-  'delete_record',
-  'list_recovery_points',
-  'create_recovery_point',
-  'get_recovery_point',
-  'download_recovery_point',
-  'delete_recovery_point',
-  'get_environment_info',
+  'rootkey_create_vault',
+  'rootkey_update_vault',
+  'rootkey_delete_vault',
+  'rootkey_list_files',
+  'rootkey_upload_file',
+  'rootkey_get_file',
+  'rootkey_download_file',
+  'rootkey_delete_file',
+  'rootkey_list_file_versions',
+  'rootkey_upload_file_version',
+  'rootkey_validate_file',
+  'rootkey_get_file_history',
+  'rootkey_get_file_validations',
+  'rootkey_generate_file_audit_report',
+  'rootkey_list_records',
+  'rootkey_create_record',
+  'rootkey_list_record_versions',
+  'rootkey_get_record_history',
+  'rootkey_get_record_validations',
+  'rootkey_delete_record',
+  'rootkey_list_recovery_points',
+  'rootkey_create_recovery_point',
+  'rootkey_get_recovery_point',
+  'rootkey_wait_for_recovery_point',
+  'rootkey_download_recovery_point',
+  'rootkey_delete_recovery_point',
+  'rootkey_get_environment_info',
 ];
 
 const READ_ONLY_TOOLS = [
-  'list_files',
-  'get_file',
-  'download_file',
-  'list_file_versions',
-  'get_file_history',
-  'get_file_validations',
-  'list_records',
-  'list_record_versions',
-  'get_record_history',
-  'get_record_validations',
-  'list_recovery_points',
-  'get_recovery_point',
-  'download_recovery_point',
-  'get_environment_info',
+  'rootkey_list_files',
+  'rootkey_get_file',
+  'rootkey_download_file',
+  'rootkey_list_file_versions',
+  'rootkey_get_file_history',
+  'rootkey_get_file_validations',
+  'rootkey_list_records',
+  'rootkey_list_record_versions',
+  'rootkey_get_record_history',
+  'rootkey_get_record_validations',
+  'rootkey_list_recovery_points',
+  'rootkey_get_recovery_point',
+  'rootkey_wait_for_recovery_point',
+  'rootkey_download_recovery_point',
+  'rootkey_get_environment_info',
 ];
 
 const page = (data: unknown[]) => ({ data, pagination: { previousCursor: null, nextCursor: null }, metadata: {} });
@@ -82,7 +84,7 @@ describe('tool registration', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...EXPECTED_TOOLS].sort());
-      expect(tools).toHaveLength(26);
+      expect(tools).toHaveLength(27);
     } finally {
       await close();
     }
@@ -93,7 +95,7 @@ describe('tool registration', () => {
     try {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([...READ_ONLY_TOOLS].sort());
-      expect(tools).toHaveLength(14);
+      expect(tools).toHaveLength(15);
     } finally {
       await close();
     }
@@ -105,20 +107,20 @@ describe('tool registration', () => {
       const { tools } = await client.listTools();
       const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
-      expect(byName.get('list_files')?.annotations?.readOnlyHint).toBe(true);
-      expect(byName.get('delete_vault')?.annotations?.destructiveHint).toBe(true);
-      expect(byName.get('delete_file')?.annotations?.destructiveHint).toBe(true);
-      expect(byName.get('delete_record')?.annotations?.destructiveHint).toBe(true);
-      expect(byName.get('delete_recovery_point')?.annotations?.destructiveHint).toBe(true);
-      expect(byName.get('upload_file')?.annotations?.destructiveHint).toBe(false);
-      expect(byName.get('get_environment_info')?.annotations?.openWorldHint).toBe(false);
-      expect(byName.get('list_files')?.annotations?.openWorldHint).toBe(true);
+      expect(byName.get('rootkey_list_files')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('rootkey_delete_vault')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('rootkey_delete_file')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('rootkey_delete_record')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('rootkey_delete_recovery_point')?.annotations?.destructiveHint).toBe(true);
+      expect(byName.get('rootkey_upload_file')?.annotations?.destructiveHint).toBe(false);
+      expect(byName.get('rootkey_get_environment_info')?.annotations?.openWorldHint).toBe(false);
+      expect(byName.get('rootkey_list_files')?.annotations?.openWorldHint).toBe(true);
 
       // A download changes nothing in the workspace, so it survives read-only mode - but it does write
       // a file, so it cannot claim readOnlyHint. The two questions are separate and answered separately.
-      expect(byName.get('download_file')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('download_recovery_point')?.annotations?.readOnlyHint).toBe(false);
-      expect(byName.get('get_file')?.annotations?.readOnlyHint).toBe(true);
+      expect(byName.get('rootkey_download_file')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('rootkey_download_recovery_point')?.annotations?.readOnlyHint).toBe(false);
+      expect(byName.get('rootkey_get_file')?.annotations?.readOnlyHint).toBe(true);
 
       for (const tool of tools) {
         expect(tool.description, `${tool.name} needs a description`).toBeTruthy();
@@ -135,9 +137,9 @@ describe('read-only mode', () => {
     const { client, close } = await connectTestClient(testConfig({ readOnly: true }));
     try {
       const names = (await client.listTools()).tools.map((tool) => tool.name);
-      expect(names).toContain('download_file');
-      expect(names).toContain('download_recovery_point');
-      expect(names).not.toContain('upload_file');
+      expect(names).toContain('rootkey_download_file');
+      expect(names).toContain('rootkey_download_recovery_point');
+      expect(names).not.toContain('rootkey_upload_file');
     } finally {
       await close();
     }
@@ -150,7 +152,7 @@ describe('read-only mode', () => {
     await withClient(
       [{ text: 'file-bytes' }],
       async (call) => {
-        const result = await call('download_file', {
+        const result = await call('rootkey_download_file', {
           fileId: 'f1',
           outputPath: path.join(elsewhere, 'exfiltrated.bin'),
         });
@@ -168,7 +170,7 @@ describe('read-only mode', () => {
     await withClient(
       [{ text: 'file-bytes' }],
       async (call) => {
-        const result = await call('download_file', { fileId: 'f1' });
+        const result = await call('rootkey_download_file', { fileId: 'f1' });
         expect(result.isError).toBeFalsy();
         expect((payloadOf(result) as { savedPath: string }).savedPath).toContain(downloadDir);
       },
@@ -187,7 +189,7 @@ describe('input schemas', () => {
         expect(tool.inputSchema.additionalProperties, tool.name).toBe(false);
       }
 
-      const local = tools.find((tool) => tool.name === 'get_environment_info');
+      const local = tools.find((tool) => tool.name === 'rootkey_get_environment_info');
       expect(local?.inputSchema).toMatchObject({ type: 'object', properties: {}, additionalProperties: false });
     } finally {
       await close();
@@ -200,7 +202,7 @@ describe('input schemas', () => {
     const { client, close } = await connectTestClient();
     try {
       const result = (await client.callTool({
-        name: 'get_environment_info',
+        name: 'rootkey_get_environment_info',
         arguments: { bogus: 1 },
       })) as CallToolResult;
 
@@ -219,11 +221,11 @@ describe('structured output', () => {
       const { tools } = await client.listTools();
       const withSchema = new Set(tools.filter((tool) => tool.outputSchema).map((tool) => tool.name));
 
-      for (const name of ['list_files', 'list_records', 'get_file_history', 'get_environment_info']) {
+      for (const name of ['rootkey_list_files', 'rootkey_list_records', 'rootkey_get_file_history', 'rootkey_get_environment_info']) {
         expect(withSchema.has(name), name).toBe(true);
       }
       // Straight API pass-through: a schema here would be a guess about someone else's contract.
-      for (const name of ['get_file', 'create_vault', 'validate_file']) {
+      for (const name of ['rootkey_get_file', 'rootkey_create_vault', 'rootkey_validate_file']) {
         expect(withSchema.has(name), name).toBe(false);
       }
     } finally {
@@ -235,7 +237,7 @@ describe('structured output', () => {
     await withClient(
       [{ json: { chainId: 137, files: page([{ id: 'f1', name: 'a.pdf' }]) } }],
       async (call) => {
-        const result = await call('list_files', { vaultAddress: VAULT });
+        const result = await call('rootkey_list_files', { vaultAddress: VAULT });
         const structured = result.structuredContent as {
           items: unknown[];
           chainId: number;
@@ -253,7 +255,7 @@ describe('structured output', () => {
 
   it('serializes compactly, since indentation is tokens nobody reads', async () => {
     await withClient([{ json: { chainId: 137, files: page([{ id: 'f1' }]) } }], async (call) => {
-      const result = await call('list_files', { vaultAddress: VAULT });
+      const result = await call('rootkey_list_files', { vaultAddress: VAULT });
       expect(textOf(result)).not.toMatch(/\n\s+"/);
     });
   });
@@ -262,7 +264,7 @@ describe('structured output', () => {
 describe('vault address mapping', () => {
   it('sends vaultAddress as ownerVault when fetching a file', async () => {
     await withClient([{ json: { chainId: 137, file: { id: 'f1' } } }], async (call, stub) => {
-      await call('get_file', { fileId: 'f1', vaultAddress: VAULT });
+      await call('rootkey_get_file', { fileId: 'f1', vaultAddress: VAULT });
       const url = stub.calls[0]!.url;
       expect(url.pathname).toBe('/api-v1/platform/files/f1');
       expect(url.searchParams.get('ownerVault')).toBe(VAULT);
@@ -271,7 +273,7 @@ describe('vault address mapping', () => {
 
   it('sends vaultAddress as ownerAddress when deleting a file', async () => {
     await withClient([{ json: { chainId: 137 } }], async (call, stub) => {
-      await call('delete_file', { fileId: 'f1', vaultAddress: VAULT });
+      await call('rootkey_delete_file', { fileId: 'f1', vaultAddress: VAULT });
       expect(stub.calls[0]!.method).toBe('DELETE');
       expect(stub.calls[0]!.url.searchParams.get('ownerAddress')).toBe(VAULT);
     });
@@ -279,14 +281,14 @@ describe('vault address mapping', () => {
 
   it('sends vaultAddress as ownerAddress when deleting a record', async () => {
     await withClient([{ json: { chainId: 137, recordId: 'r1' } }], async (call, stub) => {
-      await call('delete_record', { recordId: 'r1', vaultAddress: VAULT });
+      await call('rootkey_delete_record', { recordId: 'r1', vaultAddress: VAULT });
       expect(stub.calls[0]!.url.searchParams.get('ownerAddress')).toBe(VAULT);
     });
   });
 
   it('sends vaultAddress as a query parameter when listing files', async () => {
     await withClient([{ json: { chainId: 137, files: page([]) } }], async (call, stub) => {
-      await call('list_files', { vaultAddress: VAULT, limit: 5, order: 'asc', status: 'pending' });
+      await call('rootkey_list_files', { vaultAddress: VAULT, limit: 5, order: 'asc', status: 'pending' });
       const url = stub.calls[0]!.url;
       expect(url.searchParams.get('vaultAddress')).toBe(VAULT);
       expect(url.searchParams.get('limit')).toBe('5');
@@ -297,7 +299,7 @@ describe('vault address mapping', () => {
 
   it('puts the vault address in the path when updating a vault', async () => {
     await withClient([{ json: { walletAddress: VAULT, name: 'renamed' } }], async (call, stub) => {
-      await call('update_vault', { vaultAddress: VAULT, name: 'renamed' });
+      await call('rootkey_update_vault', { vaultAddress: VAULT, name: 'renamed' });
       expect(stub.calls[0]!.url.pathname).toBe(`/api-v1/platform/vaults/${VAULT}`);
       expect(stub.calls[0]!.body).toBe(JSON.stringify({ name: 'renamed' }));
     });
@@ -305,16 +307,16 @@ describe('vault address mapping', () => {
 
   it('interpolates a record id into the paths the spec spells fileId', async () => {
     await withClient([{ json: { chainId: 137, history: page([]) } }], async (call, stub) => {
-      await call('get_record_history', { recordId: 'rec-42' });
+      await call('rootkey_get_record_history', { recordId: 'rec-42' });
       expect(stub.calls[0]!.url.pathname).toBe('/api-v1/platform/records/rec-42/history');
     });
   });
 });
 
 describe('argument validation', () => {
-  it('rejects update_vault with neither name nor description', async () => {
+  it('rejects rootkey_update_vault with neither name nor description', async () => {
     await withClient([{ json: {} }], async (call, stub) => {
-      const result = await call('update_vault', { vaultAddress: VAULT });
+      const result = await call('rootkey_update_vault', { vaultAddress: VAULT });
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain('at least one');
       expect(stub.calls).toHaveLength(0);
@@ -323,7 +325,7 @@ describe('argument validation', () => {
 
   it('rejects a partial recovery point with no vaults listed', async () => {
     await withClient([{ json: {} }], async (call, stub) => {
-      const result = await call('create_recovery_point', { name: 'backup', scope: 'partial' });
+      const result = await call('rootkey_create_recovery_point', { name: 'backup', scope: 'partial' });
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain('at least one vault');
       expect(stub.calls).toHaveLength(0);
@@ -332,7 +334,7 @@ describe('argument validation', () => {
 
   it('rejects an empty record payload', async () => {
     await withClient([{ json: {} }], async (call) => {
-      const result = await call('create_record', { vaultAddress: VAULT, recordData: {} });
+      const result = await call('rootkey_create_record', { vaultAddress: VAULT, recordData: {} });
       expect(result.isError).toBe(true);
       expect(textOf(result)).toContain('at least one field');
     });
@@ -351,7 +353,7 @@ describe('argument validation', () => {
     await withClient(
       [{ json: {} }],
       async (call, stub) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
         expect(result.isError).toBe(true);
         expect(textOf(result)).toContain('ROOTKEY_ALLOWED_DIRS');
         expect(stub.calls).toHaveLength(0);
@@ -370,7 +372,7 @@ describe('argument validation', () => {
     await withClient(
       [{ json: {} }],
       async (call, stub) => {
-        const result = await call('validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
         expect(result.isError).toBe(true);
         expect(textOf(result)).toContain('hidden directory');
         expect(stub.calls).toHaveLength(0);
@@ -381,7 +383,7 @@ describe('argument validation', () => {
 
   it('reports a missing upload file without calling the API', async () => {
     await withClient([{ json: {} }], async (call, stub) => {
-      const result = await call('upload_file', {
+      const result = await call('rootkey_upload_file', {
         filePath: path.join(tmpdir(), 'definitely-missing-rootkey-test.bin'),
         vaultAddress: VAULT,
       });
@@ -404,7 +406,7 @@ describe('uploads', () => {
         { json: { chainId: 137, files: page([{ id: 'f9', name: 'contract.pdf' }]) } },
       ],
       async (call, stub) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
 
         const upload = stub.calls[0]!;
         expect(upload.method).toBe('POST');
@@ -433,7 +435,7 @@ describe('uploads', () => {
     await withClient(
       [{ json: { chainId: 137, transactionHash: '0xhash' } }, { json: { chainId: 137, files: page([]) } }],
       async (call, stub) => {
-        await call('upload_file', { filePath, vaultAddress: VAULT, fileName: 'invoice-2026.pdf' });
+        await call('rootkey_upload_file', { filePath, vaultAddress: VAULT, fileName: 'invoice-2026.pdf' });
         expect((stub.calls[0]!.body as FormData).get('fileName')).toBe('invoice-2026.pdf');
       },
     );
@@ -447,9 +449,9 @@ describe('uploads', () => {
     await withClient(
       [{ json: { chainId: 137, transactionHash: '0xhash' } }, { status: 500, text: 'boom' }],
       async (call) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
         expect(result.isError).toBeFalsy();
-        expect(textOf(result)).toContain('list_files');
+        expect(textOf(result)).toContain('rootkey_list_files');
         expect((payloadOf(result) as { file: unknown }).file).toBeNull();
       },
     );
@@ -457,7 +459,7 @@ describe('uploads', () => {
 
   /**
    * The API's `name` filter is `contains`, case-insensitive, so the rows that come back are candidates
-   * rather than answers. The id we pick is handed to the model and ends up in get_file and delete_file,
+   * rather than answers. The id we pick is handed to the model and ends up in rootkey_get_file and rootkey_delete_file,
    * so these three pin down that a near-miss is reported as "not found" instead of as a file.
    */
   it('never reports a same-named file of a different size as the one just uploaded', async () => {
@@ -471,11 +473,11 @@ describe('uploads', () => {
         { json: { chainId: 137, files: page([{ id: 'older', name: 'report.pdf', sizeBytes: 4096 }]) } },
       ],
       async (call) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
 
         expect(result.isError).toBeFalsy();
         expect((payloadOf(result) as { file: unknown }).file).toBeNull();
-        expect(textOf(result)).toContain('list_files');
+        expect(textOf(result)).toContain('rootkey_list_files');
       },
     );
   });
@@ -491,7 +493,7 @@ describe('uploads', () => {
         { json: { chainId: 137, files: page([{ id: 'neighbour', name: 'report.pdf.bak', sizeBytes: 1 }]) } },
       ],
       async (call) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
         expect((payloadOf(result) as { file: unknown }).file).toBeNull();
       },
     );
@@ -516,7 +518,7 @@ describe('uploads', () => {
         },
       ],
       async (call) => {
-        const result = await call('upload_file', { filePath, vaultAddress: VAULT });
+        const result = await call('rootkey_upload_file', { filePath, vaultAddress: VAULT });
         // Newest first: a row that does not report a size cannot be ruled out, so it wins.
         expect((payloadOf(result) as { file: { id: string } }).file.id).toBe('no-size');
       },
@@ -533,12 +535,12 @@ describe('uploads', () => {
     await withClient(
       [{ json: { chainId: 137, result: { ownership: true, integrity: true, validity: true } } }],
       async (call, stub) => {
-        await call('validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
+        await call('rootkey_validate_file', { fileId: 'f1', filePath, vaultAddress: VAULT });
         const form = stub.calls[0]!.body as FormData;
         expect(form.get('method')).toBe('hash');
         expect(form.get('ownerVault')).toBe(VAULT);
 
-        const rejected = await call('validate_file', {
+        const rejected = await call('rootkey_validate_file', {
           fileId: 'f1',
           filePath,
           vaultAddress: VAULT,
@@ -559,7 +561,7 @@ describe('records', () => {
         { json: { chainId: 137, records: page([{ __meta: { id: 'r5' }, invoice: 'INV-1', total: 10 }]) } },
       ],
       async (call, stub) => {
-        const result = await call('create_record', {
+        const result = await call('rootkey_create_record', {
           vaultAddress: VAULT,
           recordData: { invoice: 'INV-1', total: 10 },
         });
@@ -581,7 +583,7 @@ describe('records', () => {
         { json: { chainId: 137, records: page([{ __meta: { id: 'r9' }, invoice: 'OTHER' }]) } },
       ],
       async (call) => {
-        const result = await call('create_record', { vaultAddress: VAULT, recordData: { invoice: 'INV-2' } });
+        const result = await call('rootkey_create_record', { vaultAddress: VAULT, recordData: { invoice: 'INV-2' } });
         expect(textOf(result)).toContain('newest row');
         expect((payloadOf(result) as { matched: string }).matched).toBe('newest');
       },
@@ -590,9 +592,60 @@ describe('records', () => {
 
   it('does not fail the tool when the lookup errors', async () => {
     await withClient([{ json: { chainId: 137 } }, { status: 503, text: '' }], async (call) => {
-      const result = await call('create_record', { vaultAddress: VAULT, recordData: { a: 1 } });
+      const result = await call('rootkey_create_record', { vaultAddress: VAULT, recordData: { a: 1 } });
       expect(result.isError).toBeFalsy();
-      expect(textOf(result)).toContain('list_records');
+      expect(textOf(result)).toContain('rootkey_list_records');
+    });
+  });
+});
+
+describe('rootkey_wait_for_recovery_point', () => {
+  it('polls until the archive reaches a terminal state and reports it is downloadable', async () => {
+    await withClient(
+      [
+        { json: { recoveryPoint: { id: 'rp1', status: 'processing', progress: 40 } } },
+        { json: { recoveryPoint: { id: 'rp1', status: 'completed', progress: 100 } } },
+      ],
+      async (call, stub) => {
+        const result = await call('rootkey_wait_for_recovery_point', {
+          recoveryPointId: 'rp1',
+          pollIntervalSeconds: 1,
+          timeoutSeconds: 30,
+        });
+
+        expect(stub.calls.length).toBeGreaterThanOrEqual(2);
+        const payload = payloadOf(result) as { status: string; timedOut: boolean };
+        expect(payload.status).toBe('completed');
+        expect(payload.timedOut).toBe(false);
+        expect(textOf(result)).toContain('rootkey_download_recovery_point');
+      },
+    );
+  });
+
+  it('stops on a failed archive rather than waiting out the timeout', async () => {
+    await withClient([{ json: { recoveryPoint: { id: 'rp1', status: 'failed' } } }], async (call, stub) => {
+      const result = await call('rootkey_wait_for_recovery_point', { recoveryPointId: 'rp1', timeoutSeconds: 300 });
+
+      expect(stub.calls).toHaveLength(1);
+      expect((payloadOf(result) as { timedOut: boolean }).timedOut).toBe(false);
+      expect(textOf(result)).toContain('cannot be downloaded');
+    });
+  });
+
+  // Timing out is a normal outcome, not an error: the archive is fine, the wait simply ran out.
+  it('returns timedOut rather than an error when the archive is still building', async () => {
+    await withClient([{ json: { recoveryPoint: { id: 'rp1', status: 'processing' } } }], async (call) => {
+      const result = await call('rootkey_wait_for_recovery_point', {
+        recoveryPointId: 'rp1',
+        timeoutSeconds: 5,
+        pollIntervalSeconds: 60,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = payloadOf(result) as { timedOut: boolean; status: string };
+      expect(payload.timedOut).toBe(true);
+      expect(payload.status).toBe('processing');
+      expect(textOf(result)).toContain('call rootkey_wait_for_recovery_point again');
     });
   });
 });
@@ -602,7 +655,7 @@ describe('recovery points', () => {
     await withClient(
       [{ status: 202, json: { password: 'super-secret-pw' } }, { json: { recoveryPoints: [{ id: 'rp1', name: 'july' }] } }],
       async (call, stub) => {
-        const result = await call('create_recovery_point', { name: 'july', scope: 'global' });
+        const result = await call('rootkey_create_recovery_point', { name: 'july', scope: 'global' });
 
         expect(textOf(result)).toContain('ONE-TIME PASSWORD');
         expect(textOf(result)).toContain('super-secret-pw');
@@ -616,7 +669,7 @@ describe('recovery points', () => {
     await withClient(
       [{ status: 202, json: { password: 'pw' } }, { json: { recoveryPoints: [] } }],
       async (call, stub) => {
-        await call('create_recovery_point', {
+        await call('rootkey_create_recovery_point', {
           name: 'window',
           scope: 'partial',
           vaults: [VAULT],
@@ -636,7 +689,7 @@ describe('recovery points', () => {
 
   it('unwraps the list envelope of the unpaginated recovery point endpoint', async () => {
     await withClient([{ json: { recoveryPoints: [{ id: 'rp1' }, { id: 'rp2' }] } }], async (call) => {
-      const result = await call('list_recovery_points', {});
+      const result = await call('rootkey_list_recovery_points', {});
       expect((payloadOf(result) as { items: unknown[] }).items).toHaveLength(2);
     });
   });
@@ -649,7 +702,7 @@ describe('downloads', () => {
     await withClient(
       [{ text: 'file-contents', headers: { 'content-disposition': 'attachment; filename="anchor.txt"' } }],
       async (call) => {
-        const result = await call('download_file', { fileId: 'f1', outputPath: dir });
+        const result = await call('rootkey_download_file', { fileId: 'f1', outputPath: dir });
         const payload = payloadOf(result) as { savedPath: string; sizeBytes: number };
 
         expect(payload.savedPath).toBe(path.join(dir, 'anchor.txt'));
@@ -674,7 +727,7 @@ describe('progress', () => {
 
     try {
       await client.callTool({
-        name: 'download_file',
+        name: 'rootkey_download_file',
         arguments: { fileId: 'f1', outputPath: dir },
         _meta: { progressToken: 'tok-1' },
       });
@@ -706,7 +759,7 @@ describe('progress', () => {
 
     try {
       await client.callTool({
-        name: 'upload_file',
+        name: 'rootkey_upload_file',
         arguments: { filePath, vaultAddress: VAULT },
         _meta: { progressToken: 'tok-2' },
       });
@@ -730,7 +783,7 @@ describe('progress', () => {
     });
 
     try {
-      await client.callTool({ name: 'download_file', arguments: { fileId: 'f1', outputPath: dir } });
+      await client.callTool({ name: 'rootkey_download_file', arguments: { fileId: 'f1', outputPath: dir } });
       expect(seen).toHaveLength(0);
     } finally {
       await close();
@@ -743,7 +796,7 @@ describe('resource links', () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-dl-'));
 
     await withClient([{ text: 'file-bytes' }], async (call) => {
-      const result = await call('download_file', { fileId: 'f1', outputPath: dir });
+      const result = await call('rootkey_download_file', { fileId: 'f1', outputPath: dir });
 
       const link = result.content.find((part) => part.type === 'resource_link') as
         | { type: 'resource_link'; uri: string; name: string; description: string }
@@ -770,7 +823,7 @@ describe('error surfacing', () => {
         },
       ],
       async (call) => {
-        const result = await call('list_files', { vaultAddress: VAULT });
+        const result = await call('rootkey_list_files', { vaultAddress: VAULT });
         expect(result.isError).toBe(true);
         expect(textOf(result)).toContain('resource_not_found');
         expect(textOf(result)).toContain('req-9');
@@ -780,23 +833,23 @@ describe('error surfacing', () => {
 
   it('explains that a queued audit report is only available in the dashboard', async () => {
     await withClient([{ status: 202, json: { reportId: 'rep-1', status: 'PENDING' } }], async (call) => {
-      const result = await call('generate_file_audit_report', { fileId: 'f1', framework: 'DORA' });
+      const result = await call('rootkey_generate_file_audit_report', { fileId: 'f1', framework: 'DORA' });
       expect(textOf(result)).toContain('dashboard');
       expect((payloadOf(result) as { reportId: string }).reportId).toBe('rep-1');
     });
   });
 });
 
-describe('get_environment_info', () => {
+describe('rootkey_get_environment_info', () => {
   it('reports configuration without leaking the key', async () => {
     const { client, close } = await connectTestClient(testConfig({ readOnly: false }));
     try {
-      const result = (await client.callTool({ name: 'get_environment_info', arguments: {} })) as CallToolResult;
+      const result = (await client.callTool({ name: 'rootkey_get_environment_info', arguments: {} })) as CallToolResult;
       const payload = payloadOf(result) as Record<string, unknown>;
 
       expect(payload.keyMode).toBe('test');
       expect(payload.environment).toBe('production');
-      expect(payload.registeredTools).toBe(26);
+      expect(payload.registeredTools).toBe(27);
       expect(payload.readOnlyMode).toBe(false);
       expect(JSON.stringify(payload)).not.toContain('rk_test_unit');
     } finally {
@@ -816,7 +869,7 @@ describe('description accuracy', () => {
     const { client, close } = await connectTestClient();
     try {
       const { tools } = await client.listTools();
-      const createRecord = tools.find((tool) => tool.name === 'create_record');
+      const createRecord = tools.find((tool) => tool.name === 'rootkey_create_record');
 
       expect(createRecord?.description).toContain('NOT anchored on chain');
       expect(createRecord?.description).not.toMatch(/table and anchor it/i);
@@ -832,14 +885,14 @@ describe('description accuracy', () => {
       const { tools } = await client.listTools();
       const describe_ = (name: string) => tools.find((tool) => tool.name === name)?.description ?? '';
 
-      for (const name of ['delete_vault', 'delete_file', 'delete_record']) {
+      for (const name of ['rootkey_delete_vault', 'rootkey_delete_file', 'rootkey_delete_record']) {
         expect(describe_(name), name).toContain('Restore Center');
         expect(describe_(name), name).not.toMatch(/permanently delete/i);
         expect(describe_(name), name).not.toMatch(/audited on chain/i);
       }
 
-      expect(describe_('delete_recovery_point')).toMatch(/genuinely irreversible/i);
-      expect(describe_('delete_recovery_point')).not.toContain('Restore Center entry for it.\nRecoverable');
+      expect(describe_('rootkey_delete_recovery_point')).toMatch(/genuinely irreversible/i);
+      expect(describe_('rootkey_delete_recovery_point')).not.toContain('Restore Center entry for it.\nRecoverable');
     } finally {
       await close();
     }
@@ -849,7 +902,7 @@ describe('description accuracy', () => {
     const { client, close } = await connectTestClient();
     try {
       const { tools } = await client.listTools();
-      const deletes = tools.filter((tool) => tool.name.startsWith('delete_'));
+      const deletes = tools.filter((tool) => tool.name.startsWith('rootkey_delete_'));
 
       expect(deletes).toHaveLength(4);
       for (const tool of deletes) {
