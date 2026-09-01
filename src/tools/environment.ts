@@ -10,7 +10,7 @@ import type { ToolDefinition } from './shared.js';
 export function environmentTools(toolCount: () => number): ToolDefinition[] {
   return [
     {
-      name: 'get_environment_info',
+      name: 'rootkey_get_environment_info',
       title: 'Get server environment info',
       description:
         'Report how this ROOTKey MCP server is configured: version, API base URL, environment, whether the ' +

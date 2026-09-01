@@ -1,0 +1,3630 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ROOTKey Documentation",
+    "description": "Your API of choice for creating, managing, and validating information easily and securely!",
+    "termsOfService": "https://www.rootkey.ai/legal/privacy-policy",
+    "contact": {
+      "name": "ROOTKey",
+      "url": "https://www.rootkey.ai/contact",
+      "email": "support@rootkey.ai"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "description": "Production",
+      "url": "https://api.rootkey.ai/api-v1/"
+    }
+  ],
+  "security": [
+    {
+      "x-api-key": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "api-v1-public",
+      "description": "Unauthenticated top-level /api-v1 endpoints (health, plans, annual report)"
+    },
+    {
+      "name": "api-v1-files",
+      "description": "File anchoring, versioning, validation and compliance reporting (/api-v1/platform/files)"
+    },
+    {
+      "name": "api-v1-records",
+      "description": "Structured-data record anchoring (/api-v1/platform/records)"
+    },
+    {
+      "name": "api-v1-vaults",
+      "description": "Vault lifecycle: create / update / delete (/api-v1/platform/vaults)"
+    },
+    {
+      "name": "api-v1-recovery-points",
+      "description": "Backup archives created from vault contents (/api-v1/platform/recovery-point)"
+    }
+  ],
+  "paths": {
+    "/platform/vaults": {
+      "post": {
+        "summary": "Create vault",
+        "description": "Creates a new vault and assigns it to the specified team. Returns the chain ID, address, name and description.",
+        "tags": [
+          "api-v1-vaults"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "vaultName"
+                ],
+                "properties": {
+                  "vaultName": {
+                    "type": "string",
+                    "example": "Compliance Vault Q1"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "teamId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Optional. ID of the team that will own the vault. Defaults to the organization's 'General' team."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Vault created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chainId": {
+                      "type": "number",
+                      "example": 137
+                    },
+                    "address": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid API key"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/vaults/{vaultAddress}": {
+      "put": {
+        "summary": "Update vault",
+        "description": "Updates the name and/or description of a vault.",
+        "tags": [
+          "api-v1-vaults"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vaultAddress",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vault updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Vault not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete vault",
+        "description": "Deletes a vault. Returns 200 with an empty body on success.",
+        "tags": [
+          "api-v1-vaults"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vaultAddress",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vault deleted"
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Vault not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files": {
+      "get": {
+        "summary": "List files",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vaultAddress",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Blockchain address of the vault to list files from"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cursor from the previous page (ISO createdAt of the last item)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by file name"
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "registered",
+                "error"
+              ]
+            },
+            "description": "Filter by anchoring status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListFilesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Wallet not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create file",
+        "description": "Uploads a file and anchors its hash to create a verifiable record. The file becomes part of the specified vault.",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "ownerVault"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to upload"
+                  },
+                  "ownerVault": {
+                    "type": "string",
+                    "description": "Address of the vault that will own the file",
+                    "example": "0xdf67CA8286510997567685c0385ECeAb11C23C92"
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "description": "Override the file's display name"
+                  },
+                  "expirationDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Optional expiry date-time for the smart contract"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File anchored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSmartContractResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Wallet not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{parentId}/versions": {
+      "get": {
+        "summary": "List file versions",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vaultAddress",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Blockchain address of the vault that owns the file"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of file versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedFileDTOResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Parent file not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create file version",
+        "description": "Uploads a new version of an existing file, keeping the parent's version history.",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "ownerVault"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "ownerVault": {
+                    "type": "string",
+                    "example": "0xdf67CA8286510997567685c0385ECeAb11C23C92"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "expirationDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New version anchored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSmartContractResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Wallet not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}": {
+      "get": {
+        "summary": "Fetch file with details",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerVault",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Blockchain address of the vault that owns the file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete file",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerAddress",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Blockchain address of the vault that owns the file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChainIdResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}/download": {
+      "get": {
+        "summary": "Download file",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Shareable-link token (alternative to authenticating via API key)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary file stream",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}/history": {
+      "get": {
+        "summary": "Fetch file history",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated activity history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchFileHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}/validations": {
+      "get": {
+        "summary": "Fetch file validations",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current & previous hashes plus paginated validations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchValidationHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}/validate": {
+      "post": {
+        "summary": "Validate file",
+        "description": "Uploads a file and compares it against the anchored version to verify integrity, ownership and validity.",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "method",
+                  "ownerVault"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "method": {
+                    "type": "string",
+                    "example": "hash"
+                  },
+                  "ownerVault": {
+                    "type": "string",
+                    "example": "0xdf67CA8286510997567685c0385ECeAb11C23C92"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareFilesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/files/{fileId}/audit-report": {
+      "post": {
+        "summary": "Create file audit report",
+        "description": "Enqueues a compliance audit report for the given file. The report is generated asynchronously; the response returns the report ID and its initial pending status.",
+        "tags": [
+          "api-v1-files"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "framework": {
+                    "type": "string",
+                    "enum": [
+                      "NIS2",
+                      "DORA"
+                    ],
+                    "default": "NIS2"
+                  },
+                  "periodStart": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Reporting period start (defaults to file createdAt)"
+                  },
+                  "periodEnd": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Reporting period end (defaults to now)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Report generation job accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateComplianceReportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Subscription limit exceeded, feature not found, or user is not an organization member"
+          },
+          "404": {
+            "description": "File not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/records": {
+      "get": {
+        "summary": "List records",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vaultAddress",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "registered",
+                "error"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListRecordsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Wallet not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create record",
+        "description": "Creates a structured, integrity-hashed record inside a **table**.\n\n**This endpoint also creates versions.** ROOTKey groups a record's versions by the table's **primary key** — the schema's key column, which (until one is explicitly designated) is the **first field**, by convention an `id`.\n\n- If **no record with that key value exists yet**, the payload is stored as a new **root** record.\n- If a **record with the same key value already exists**, the payload is stored as a **new version** of that entity (a database-style update). The version's `parentId` is set to the existing root automatically — you do not send it.\n\nSo to update an entity, simply `POST` the same primary key again — there is **no separate version-creation endpoint**; versioning is a built-in behaviour of this route.\n\nVersioning only applies when the table has a schema **and** the payload is a keyed object with a non-empty key value; otherwise the record is stored as a standalone root.\n\n**Response:** returns only `{ chainId }`. The new record's `id` is **not** returned here — read it from `GET /platform/records` (the `__meta.id` field of each item).",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRecordRequest"
+              },
+              "example": {
+                "ownerVault": "0xdf67CA8286510997567685c0385ECeAb11C23C92",
+                "recordData": {
+                  "id": "prod-001",
+                  "name": "ACME Corp",
+                  "logoUrl": "https://media.example.com/acme.svg",
+                  "active": true
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Record created (or a new version, if its primary key already existed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateRecordResponse"
+                },
+                "example": {
+                  "chainId": 137
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated — missing or invalid API key"
+          },
+          "404": {
+            "description": "Table not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/records/{parentId}/versions": {
+      "get": {
+        "summary": "List record versions",
+        "description": "Returns the version history of a record, newest first by default. `parentId` is the record's `id` (from the `__meta.id` field of a List Records item). Each item is a full record version including its decrypted column values in `data`.\n\n**Response shape:** this endpoint returns a bare pagination envelope (`data` / `pagination` / `metadata`) — unlike List Records and Fetch Record History, there is **no `chainId` wrapper**.",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "path",
+            "required": true,
+            "description": "The record `id` whose versions to list (a branch root's id).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vaultAddress",
+            "in": "query",
+            "required": true,
+            "description": "Address of the table that owns the record.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of record versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedRecordDTOResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Record not found (or not owned by the caller's table)"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/records/{fileId}/history": {
+      "get": {
+        "summary": "Fetch record history",
+        "description": "Returns the activity/audit log for a record — creation, new versions, deletion, and related events — newest first by default. `fileId` is the record's `id` (from `__meta.id`).",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "description": "The record `id` whose history to fetch.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated activity history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchFileHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Record not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/records/{fileId}/validations": {
+      "get": {
+        "summary": "Fetch record validations",
+        "description": "Returns the integrity-validation history for a record — each entry compares the stored payload against its integrity hash. `fileId` is the record's `id` (from `__meta.id`).\n\n**Response shape:** returned directly with **no `chainId` wrapper** — `{ currentHash, previousHash, validations }`, where `currentHash`/`previousHash` are the hashes of the current and parent-version payloads.",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "description": "The record `id` whose validations to fetch.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "default": 10
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current & previous hashes plus paginated validations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FetchValidationHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "404": {
+            "description": "Record not found"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/records/{recordId}": {
+      "delete": {
+        "summary": "Delete record",
+        "description": "Deletes a record. Once deleted, it no longer appears in list or fetch responses.\n\nAuthorization: the caller's organization must own the table identified by `ownerAddress`, and that table must own the record.",
+        "tags": [
+          "api-v1-records"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recordId",
+            "in": "path",
+            "required": true,
+            "description": "The record `id` to delete (from `__meta.id`).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerAddress",
+            "in": "query",
+            "required": true,
+            "description": "Address of the table that owns the record.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Record deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteRecordResponse"
+                },
+                "example": {
+                  "chainId": 137,
+                  "recordId": "0f3c1e77-4b2a-4c1d-9f3e-6a1b2c3d4e5f"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "The table does not own this record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Table or record not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DomainErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/recovery-point": {
+      "get": {
+        "summary": "List recovery points",
+        "tags": [
+          "api-v1-recovery-points"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery points",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recoveryPoints": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecoveryPointDTO"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create recovery point",
+        "description": "Enqueues creation of a new recovery point. Returns a one-time decryption password for the resulting archive.",
+        "tags": [
+          "api-v1-recovery-points"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "scope"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Full Backup 2026-07-03"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "global",
+                      "partial"
+                    ],
+                    "description": "'global' includes all org vaults; 'partial' requires `vaults`"
+                  },
+                  "vaults": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Vault addresses (required when scope='partial')"
+                  },
+                  "timeRange": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "end": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Recovery point creation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "password": {
+                      "type": "string",
+                      "description": "One-time decryption password for the resulting archive",
+                      "example": "AB12-CdEfGhIjKlMn-OpQrStUvWxYz-AaBbCcDdEeFf"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/recovery-point/{recoveryPointId}": {
+      "get": {
+        "summary": "Fetch recovery point",
+        "tags": [
+          "api-v1-recovery-points"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recoveryPointId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery point",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recoveryPoint": {
+                      "$ref": "#/components/schemas/RecoveryPointDTO"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete recovery point",
+        "tags": [
+          "api-v1-recovery-points"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recoveryPointId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recovery point deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/platform/recovery-point/{recoveryPointId}/download": {
+      "get": {
+        "summary": "Download recovery point",
+        "description": "Returns the recovery point archive. The archive is encrypted with the one-time password returned when the recovery point was created.",
+        "tags": [
+          "api-v1-recovery-points"
+        ],
+        "security": [
+          {
+            "x-api-key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "recoveryPointId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archive file stream",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DomainError"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "x-api-key": {
+        "type": "apiKey",
+        "name": "x-api-key",
+        "in": "header",
+        "description": "ROOTKey API key (rk_live_... for production, rk_test_... for the test network)."
+      }
+    },
+    "responses": {
+      "DomainError": {
+        "description": "Domain-level error (validation, business rule violation, resource not found)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DomainErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DomainErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "DomainErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "errorCode": {
+                "type": "string"
+              },
+              "docUrl": {
+                "type": "string"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "PaginationBlock": {
+        "type": "object",
+        "properties": {
+          "previousCursor": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaginationMetadata": {
+        "type": "object",
+        "properties": {
+          "fetchedCount": {
+            "type": "number"
+          },
+          "totalCount": {
+            "type": "number"
+          },
+          "serverTimestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "limit": {
+                "type": "number"
+              },
+              "cursor": {
+                "type": "string",
+                "nullable": true
+              },
+              "order": {
+                "type": "string",
+                "enum": [
+                  "asc",
+                  "desc"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "ListFilesXMetadata": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PaginationMetadata"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "registered": {
+                "type": "number"
+              },
+              "pending": {
+                "type": "number"
+              },
+              "error": {
+                "type": "number"
+              },
+              "totalSizeBytes": {
+                "type": "number"
+              },
+              "last24hCount": {
+                "type": "number"
+              }
+            }
+          }
+        ]
+      },
+      "FileDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "versionsNumber": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string",
+            "example": "brand_guidelines.pdf"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "description": "Raw byte size"
+          },
+          "extension": {
+            "type": "string",
+            "example": "PDF"
+          },
+          "lastValidateAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "FAILED",
+              "REGISTERED"
+            ]
+          },
+          "integrity": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string"
+          },
+          "isTest": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "vault": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "example": "Marketing Assets"
+              },
+              "address": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "FileWithWalletDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FileDTO"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "organizationId": {
+                "type": "string"
+              },
+              "blockchainId": {
+                "type": "string"
+              },
+              "transactionHash": {
+                "type": "string"
+              },
+              "chainId": {
+                "type": "number"
+              },
+              "expirationDate": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "contractAddress": {
+                "type": "string"
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "author": {
+                "nullable": true,
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              },
+              "metrics": {
+                "type": "object",
+                "properties": {
+                  "totalDownloads": {
+                    "type": "number"
+                  },
+                  "totalShares": {
+                    "type": "number"
+                  },
+                  "totalVersions": {
+                    "type": "number"
+                  },
+                  "totalValidations": {
+                    "type": "number"
+                  },
+                  "uniqueUsers": {
+                    "type": "number"
+                  },
+                  "uniqueIPs": {
+                    "type": "number"
+                  },
+                  "lastActivity": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  }
+                }
+              }
+            },
+            "required": [
+              "transactionHash",
+              "chainId",
+              "contractAddress"
+            ]
+          }
+        ]
+      },
+      "PaginatedFileDTOResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileDTO"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationBlock"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PaginationMetadata"
+          }
+        }
+      },
+      "ListFilesResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "files": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FileDTO"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationBlock"
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/ListFilesXMetadata"
+              }
+            }
+          }
+        }
+      },
+      "ListRecordsResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "records": {
+            "type": "object",
+            "description": "Paginated records — each item's top-level fields are the record's decrypted column values (dynamic, per the table schema), plus a reserved `__meta` object carrying the record's identifiers.",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RecordListItem"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationBlock"
+              },
+              "metadata": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PaginationMetadata"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "registered": {
+                        "type": "number"
+                      },
+                      "pending": {
+                        "type": "number"
+                      },
+                      "error": {
+                        "type": "number"
+                      },
+                      "last24hCount": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "FetchFileResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "file": {
+            "$ref": "#/components/schemas/FileWithWalletDetails"
+          }
+        }
+      },
+      "ItemActivityWithDetailsDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "recordId": {
+            "type": "string"
+          },
+          "member": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "imagePath": {
+                "type": "string"
+              }
+            }
+          },
+          "apiKey": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              }
+            }
+          },
+          "connector": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          },
+          "action": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "actorType": {
+            "type": "string",
+            "enum": [
+              "member",
+              "anonymous",
+              "api_key",
+              "connector",
+              "system"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FetchFileHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "history": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ItemActivityWithDetailsDTO"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationBlock"
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/PaginationMetadata"
+              }
+            }
+          }
+        }
+      },
+      "ValidationDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileId": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "validator": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "userAgent": {
+            "type": "string",
+            "nullable": true
+          },
+          "validatedBy": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "memberId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FetchValidationHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "currentHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "previousHash": {
+            "type": "string",
+            "nullable": true
+          },
+          "validations": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ValidationDTO"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationBlock"
+              },
+              "metadata": {
+                "$ref": "#/components/schemas/PaginationMetadata"
+              }
+            }
+          }
+        }
+      },
+      "CompareFilesResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "ownership": {
+                "type": "boolean",
+                "description": "Whether the submitting party owns the anchored file"
+              },
+              "integrity": {
+                "type": "boolean",
+                "description": "Whether the file hash matches the anchored hash"
+              },
+              "validity": {
+                "type": "boolean",
+                "description": "Whether the smart contract is still valid (not expired or revoked)"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ownership",
+              "integrity",
+              "validity"
+            ]
+          }
+        }
+      },
+      "GenerateComplianceReportResponse": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "description": "ID of the created compliance report",
+            "example": "cmpr_abc123"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING"
+            ],
+            "description": "Initial status; the report is processed asynchronously"
+          }
+        },
+        "required": [
+          "reportId",
+          "status"
+        ]
+      },
+      "ChainIdResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "description": "Polygon chain ID (137 in production, 80002 on Amoy testnet)",
+            "example": 137
+          }
+        }
+      },
+      "CreateSmartContractResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "transactionHash": {
+            "type": "string",
+            "description": "On-chain transaction hash of the anchoring transaction",
+            "example": "0xabc123..."
+          }
+        },
+        "required": [
+          "chainId",
+          "transactionHash"
+        ]
+      },
+      "CreateRecordRequest": {
+        "type": "object",
+        "required": [
+          "ownerVault",
+          "recordData"
+        ],
+        "properties": {
+          "ownerVault": {
+            "type": "string",
+            "description": "Address of the table that will own the record. (`ownerWallet` is accepted as an alias.)",
+            "example": "0xdf67CA8286510997567685c0385ECeAb11C23C92"
+          },
+          "recordData": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The record's columns as a JSON object. Values are primitives (string, number, boolean, ISO date, null) or nested objects/arrays within limits: 1 MB per record, 64 KB per string, 100 properties, 10 levels of nesting, 1,000 array elements. Keys beginning with `__` (and prototype-polluting keys) are stripped on ingest. The value of the schema's key column (the primary key) determines version grouping — see the endpoint description."
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Optional expiry date-time for the record."
+          }
+        }
+      },
+      "CreateRecordResponse": {
+        "type": "object",
+        "description": "Record create/version response. Note: unlike files, record creation does not return a `transactionHash` or the new record `id` — obtain the id from `GET /platform/records` (`__meta.id`).",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "description": "Polygon chain ID (137 in production, 80002 on the Amoy testnet).",
+            "example": 137
+          }
+        },
+        "required": [
+          "chainId"
+        ]
+      },
+      "RecordMeta": {
+        "type": "object",
+        "description": "Reserved metadata envelope attached to every List Records item. `__`-prefixed keys are stripped from user data on ingest, so this never collides with a user-defined column.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's unique id — use as `parentId` for versions and as `recordId` for history / validations / delete.",
+            "example": "0f3c1e77-4b2a-4c1d-9f3e-6a1b2c3d4e5f"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The branch root's id when this record is a version; null for a root record."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "REGISTERED",
+              "FAILED"
+            ],
+            "description": "Anchoring status (uppercase). Note: the List Records `status` query filter takes the lowercase form — `pending` / `registered` / `error`."
+          },
+          "versionsNumber": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RecordListItem": {
+        "type": "object",
+        "description": "A record as returned by List Records: the record's decrypted column values spread at the top level (dynamic, per the table schema), plus a reserved `__meta` object.",
+        "additionalProperties": true,
+        "properties": {
+          "__meta": {
+            "$ref": "#/components/schemas/RecordMeta"
+          }
+        },
+        "example": {
+          "id": "prod-001",
+          "name": "ACME Corp",
+          "logoUrl": "https://media.example.com/acme.svg",
+          "active": true,
+          "__meta": {
+            "id": "0f3c1e77-4b2a-4c1d-9f3e-6a1b2c3d4e5f",
+            "parentId": null,
+            "status": "REGISTERED",
+            "versionsNumber": 2,
+            "createdAt": "2026-07-18T10:12:04.000Z"
+          }
+        }
+      },
+      "RecordDTO": {
+        "type": "object",
+        "description": "Full record representation returned by List Record Versions.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Organization member who created this version; null when created via API key."
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "blockchainId": {
+            "type": "string",
+            "nullable": true,
+            "description": "On-chain identifier; null for records (records are integrity-hashed, not blockchain-anchored)."
+          },
+          "versionsNumber": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "REGISTERED",
+              "FAILED"
+            ]
+          },
+          "transactionHash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Always null for records — records are not submitted to the blockchain."
+          },
+          "ownerAddress": {
+            "type": "string"
+          },
+          "chainId": {
+            "type": "number"
+          },
+          "dataHash": {
+            "type": "string",
+            "description": "Integrity hash of the record payload."
+          },
+          "integrity": {
+            "type": "number",
+            "description": "Integrity score (100 when REGISTERED, else 0)."
+          },
+          "vault": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "example": "Partner Logos"
+              },
+              "address": {
+                "type": "string"
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The decrypted column values of this record version."
+          },
+          "isTest": {
+            "type": "boolean"
+          },
+          "expirationDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastValidateAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PaginatedRecordDTOResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecordDTO"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationBlock"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/PaginationMetadata"
+          }
+        }
+      },
+      "DeleteRecordResponse": {
+        "type": "object",
+        "properties": {
+          "chainId": {
+            "type": "number",
+            "example": 137
+          },
+          "recordId": {
+            "type": "string",
+            "description": "The id of the deleted record."
+          }
+        },
+        "required": [
+          "chainId",
+          "recordId"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Healthy",
+              "Unhealthy"
+            ],
+            "example": "Healthy"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Process uptime in seconds"
+          },
+          "responseTime": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "description": "process.hrtime() tuple — [seconds, nanoseconds]"
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "databse": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "description": "NOTE: source key is misspelled `databse` (see VerifyAppHealth use case)"
+              },
+              "messaging": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              },
+              "queue": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "numberOfTeams": {
+                "type": "number"
+              },
+              "numberOfVaults": {
+                "type": "number"
+              },
+              "numberOfOrganizations": {
+                "type": "number"
+              },
+              "numberOfUsers": {
+                "type": "number"
+              }
+            }
+          },
+          "heapUsed": {
+            "type": "string",
+            "example": "42 MB"
+          },
+          "heapTotal": {
+            "type": "string"
+          },
+          "external": {
+            "type": "string"
+          },
+          "rss": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PlanDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number"
+          },
+          "isCustom": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "PlanFeatureSnapshot — keys and values vary by plan"
+            }
+          }
+        }
+      },
+      "RecoveryPointDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vaults": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Vault addresses included in this recovery point"
+          },
+          "timeRange": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "enqueued | processing | completed | failed"
+          },
+          "integrity": {
+            "type": "number",
+            "description": "Integrity score (0–100)"
+          },
+          "numberOfFiles": {
+            "type": "number"
+          },
+          "progress": {
+            "type": "number",
+            "description": "Completion percentage (0–100)"
+          },
+          "size": {
+            "type": "number",
+            "description": "Estimated archive size in bytes"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "global",
+              "partial"
+            ]
+          },
+          "hash": {
+            "type": "string",
+            "nullable": true,
+            "description": "Blockchain hash of the archive, available once status is 'completed'"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WalletDTO": {
+        "type": "object",
+        "description": "Vault (wallet) representation returned from update operations",
+        "properties": {
+          "walletAddress": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "isTest": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "OntologyClass": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "ip",
+              "vault",
+              "user",
+              "share"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "count": {
+            "type": "number"
+          }
+        }
+      },
+      "OntologyRelation": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "enum": [
+              "file",
+              "ip",
+              "vault",
+              "user",
+              "share"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "enum": [
+              "file",
+              "ip",
+              "vault",
+              "user",
+              "share"
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        }
+      },
+      "EntityInstance": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "ip",
+              "vault",
+              "user",
+              "share"
+            ]
+          },
+          "meta": {
+            "type": "object",
+            "description": "Entity-specific metadata; shape varies by type"
+          }
+        }
+      },
+      "OntologyData": {
+        "type": "object",
+        "properties": {
+          "classes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OntologyClass"
+            }
+          },
+          "relations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OntologyRelation"
+            }
+          },
+          "sampleInstances": {
+            "type": "object",
+            "description": "Up to 5 sample entity instances keyed by entity type",
+            "properties": {
+              "file": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EntityInstance"
+                }
+              },
+              "ip": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EntityInstance"
+                }
+              },
+              "vault": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EntityInstance"
+                }
+              },
+              "user": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EntityInstance"
+                }
+              },
+              "share": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EntityInstance"
+                }
+              }
+            }
+          }
+        }
+      },
+      "GraphNode": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "file",
+              "ip",
+              "vault",
+              "user",
+              "share"
+            ]
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "GraphEdge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SecurityEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EntityInvestigationData": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            }
+          },
+          "securityEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityEvent"
+            }
+          },
+          "entityCounts": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "number"
+              },
+              "ip": {
+                "type": "number"
+              },
+              "vault": {
+                "type": "number"
+              },
+              "user": {
+                "type": "number"
+              },
+              "share": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "LastAnchorOutput": {
+        "type": "object",
+        "required": [
+          "fileId",
+          "fileName",
+          "txHash",
+          "chain",
+          "explorerUrl",
+          "anchoredAt",
+          "totalAnchored"
+        ],
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "example": "contract-2026-q1.pdf"
+          },
+          "txHash": {
+            "type": "string",
+            "description": "0x-prefixed lowercased transaction hash"
+          },
+          "chain": {
+            "type": "string",
+            "example": "Polygon Mainnet"
+          },
+          "explorerUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "anchoredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalAnchored": {
+            "type": "number"
+          }
+        }
+      },
+      "ComplianceFramework": {
+        "type": "string",
+        "enum": [
+          "NIS2",
+          "DORA",
+          "GDPR",
+          "ISO_27001",
+          "SOC_2"
+        ]
+      },
+      "TrustSettingsDTO": {
+        "type": "object",
+        "required": [
+          "organizationId",
+          "orgName",
+          "slug",
+          "slugIsCustom",
+          "published",
+          "frameworks",
+          "accentColor",
+          "description"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orgName": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "slugIsCustom": {
+            "type": "boolean",
+            "description": "true when the persisted slug differs from the slug derived from orgName"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "frameworks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceFramework"
+            }
+          },
+          "logoUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "accentColor": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "description": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedBy": {
+            "nullable": true,
+            "type": "object",
+            "required": [
+              "userId",
+              "email",
+              "name"
+            ],
+            "properties": {
+              "userId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "UpdateTrustSettingsBody": {
+        "type": "object",
+        "description": "All fields optional. Only present fields are applied. The trust page logo mirrors the organisation logo, set via the organisation profile use case — it is NOT writable here.",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "frameworks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceFramework"
+            }
+          },
+          "accentColor": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "SlugAvailabilityResult": {
+        "type": "object",
+        "required": [
+          "available",
+          "normalized"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "normalized": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Only present when available=false."
+          }
+        }
+      },
+      "TrustMetricsTimeSeriesEntry": {
+        "type": "object",
+        "required": [
+          "date",
+          "value"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number"
+          }
+        }
+      },
+      "TrustMetricsHistory": {
+        "type": "object",
+        "required": [
+          "uptime",
+          "validations",
+          "vaults",
+          "countries"
+        ],
+        "properties": {
+          "uptime": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrustMetricsTimeSeriesEntry"
+            }
+          },
+          "validations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrustMetricsTimeSeriesEntry"
+            }
+          },
+          "vaults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrustMetricsTimeSeriesEntry"
+            }
+          },
+          "countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrustMetricsTimeSeriesEntry"
+            }
+          }
+        }
+      },
+      "PublicLastAnchor": {
+        "type": "object",
+        "required": [
+          "timestamp",
+          "txHash"
+        ],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "txHash": {
+            "type": "string"
+          },
+          "blockNumber": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "PublicAnchorEntry": {
+        "type": "object",
+        "required": [
+          "hash",
+          "timestamp"
+        ],
+        "properties": {
+          "hash": {
+            "type": "string"
+          },
+          "blockNumber": {
+            "type": "number",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PublicTrustOverviewOutput": {
+        "type": "object",
+        "required": [
+          "slug",
+          "orgName",
+          "description",
+          "accentColor",
+          "totalAnchors",
+          "anchorsLast24h",
+          "filesProtected",
+          "vaultsActive",
+          "frameworks",
+          "metrics",
+          "metricsHistory",
+          "recentAnchors"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "orgName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "logoUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "accentColor": {
+            "type": "string"
+          },
+          "totalAnchors": {
+            "type": "number"
+          },
+          "anchorsLast24h": {
+            "type": "number"
+          },
+          "lastAnchor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PublicLastAnchor"
+              }
+            ],
+            "nullable": true
+          },
+          "filesProtected": {
+            "type": "number"
+          },
+          "vaultsActive": {
+            "type": "number"
+          },
+          "frameworks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComplianceFramework"
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "required": [
+              "uptimePct",
+              "validationSuccessPct",
+              "vaultDiversity",
+              "memberCountries"
+            ],
+            "properties": {
+              "uptimePct": {
+                "type": "number"
+              },
+              "validationSuccessPct": {
+                "type": "number"
+              },
+              "vaultDiversity": {
+                "type": "number"
+              },
+              "memberCountries": {
+                "type": "number"
+              }
+            }
+          },
+          "metricsHistory": {
+            "$ref": "#/components/schemas/TrustMetricsHistory"
+          },
+          "recentAnchors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicAnchorEntry"
+            }
+          }
+        }
+      },
+      "VerifyAnchorOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Hash matched a registered anchor",
+            "required": [
+              "verified",
+              "hash",
+              "fileName",
+              "blockNumber",
+              "timestamp",
+              "txHash"
+            ],
+            "properties": {
+              "verified": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              },
+              "hash": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "blockNumber": {
+                "type": "number",
+                "nullable": true,
+                "description": "Always null today (TD-B6)"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "txHash": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Hash not found or invalid",
+            "required": [
+              "verified",
+              "hash",
+              "reason"
+            ],
+            "properties": {
+              "verified": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "hash": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "not_found",
+                  "invalid_hash"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

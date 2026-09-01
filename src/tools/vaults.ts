@@ -5,7 +5,7 @@ import { optionalString, requireString, vaultAddressArg, type ToolDefinition } f
 
 export const vaultTools: ToolDefinition[] = [
   {
-    name: 'create_vault',
+    name: 'rootkey_create_vault',
     title: 'Create vault',
     description:
       'Create a vault (or table) to hold files or records. Returns the new vault address, which every ' +
@@ -37,7 +37,7 @@ export const vaultTools: ToolDefinition[] = [
   },
 
   {
-    name: 'update_vault',
+    name: 'rootkey_update_vault',
     title: 'Update vault',
     description: 'Rename a vault or change its description. Pass at least one of name or description.',
     idempotent: true,
@@ -65,7 +65,7 @@ export const vaultTools: ToolDefinition[] = [
   },
 
   {
-    name: 'delete_vault',
+    name: 'rootkey_delete_vault',
     title: 'Delete vault',
     description:
       'Delete a vault and everything inside it. The vault and its files move to the trash: they stop appearing ' +

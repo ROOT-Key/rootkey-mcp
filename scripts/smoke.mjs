@@ -64,52 +64,52 @@ async function call(name, args = {}) {
 }
 
 try {
-  const env = await call('get_environment_info');
+  const env = await call('rootkey_get_environment_info');
   console.log(`    ${env.environment} at ${env.baseUrl} (${env.keyMode} key, ${env.registeredTools} tools)`);
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const vault = await call('create_vault', {
+  const vault = await call('rootkey_create_vault', {
     vaultName: `mcp-smoke-${stamp}`,
     description: 'Temporary vault created by the rootkey-mcp smoke test.',
   });
   const vaultAddress = vault.address;
-  if (!vaultAddress) throw new Error('create_vault returned no address');
+  if (!vaultAddress) throw new Error('rootkey_create_vault returned no address');
   console.log(`    vault ${vaultAddress}`);
-  cleanup.push(() => call('delete_vault', { vaultAddress }));
+  cleanup.push(() => call('rootkey_delete_vault', { vaultAddress }));
 
   const dir = await mkdtemp(path.join(tmpdir(), 'rootkey-smoke-'));
   const filePath = path.join(dir, 'smoke.txt');
   await writeFile(filePath, `rootkey-mcp smoke test ${stamp}\n`);
 
-  const uploaded = await call('upload_file', { filePath, vaultAddress });
+  const uploaded = await call('rootkey_upload_file', { filePath, vaultAddress });
   const fileId = uploaded.file?.id;
   console.log(`    tx ${uploaded.transactionHash ?? 'n/a'}, file id ${fileId ?? 'not resolved yet'}`);
 
-  const listed = await call('list_files', { vaultAddress, limit: 5 });
+  const listed = await call('rootkey_list_files', { vaultAddress, limit: 5 });
   console.log(`    ${listed.items.length} file(s) in the vault`);
 
   if (fileId) {
-    cleanup.unshift(() => call('delete_file', { fileId, vaultAddress }));
-    await call('get_file', { fileId, vaultAddress });
-    await call('validate_file', { fileId, filePath, vaultAddress });
-    const saved = await call('download_file', { fileId, outputPath: dir });
+    cleanup.unshift(() => call('rootkey_delete_file', { fileId, vaultAddress }));
+    await call('rootkey_get_file', { fileId, vaultAddress });
+    await call('rootkey_validate_file', { fileId, filePath, vaultAddress });
+    const saved = await call('rootkey_download_file', { fileId, outputPath: dir });
     console.log(`    downloaded to ${saved.savedPath} (${saved.sizeBytes} bytes)`);
-    await call('get_file_history', { fileId, limit: 5 });
-    await call('get_file_validations', { fileId, limit: 5 });
+    await call('rootkey_get_file_history', { fileId, limit: 5 });
+    await call('rootkey_get_file_validations', { fileId, limit: 5 });
   } else {
     console.log('    skipping file detail steps: anchoring has not surfaced an id yet');
   }
 
-  const record = await call('create_record', {
+  const record = await call('rootkey_create_record', {
     vaultAddress,
     recordData: { reference: `smoke-${stamp}`, source: 'rootkey-mcp smoke test' },
   });
   const recordId = record.record?.__meta?.id;
   console.log(`    record ${recordId ?? 'not resolved'} (match: ${record.matched ?? 'none'})`);
-  if (recordId) cleanup.unshift(() => call('delete_record', { recordId, vaultAddress }));
+  if (recordId) cleanup.unshift(() => call('rootkey_delete_record', { recordId, vaultAddress }));
 
-  await call('list_records', { vaultAddress, limit: 5 });
-  await call('list_recovery_points');
+  await call('rootkey_list_records', { vaultAddress, limit: 5 });
+  await call('rootkey_list_recovery_points');
 
   console.log('\nAll steps passed. Cleaning up.');
 } catch (error) {

@@ -19,7 +19,7 @@ import {
 const recordIdArg = z
   .string()
   .min(1)
-  .describe('Record id, taken from __meta.id in a list_records result.');
+  .describe('Record id, taken from __meta.id in a rootkey_list_records result.');
 
 /** Deep structural comparison, used to spot the row we just wrote among the newest rows. */
 function matchesPayload(row: RecordRow, payload: Record<string, unknown>): boolean {
@@ -62,7 +62,7 @@ async function findCreatedRecord(
 
 export const recordTools: ToolDefinition[] = [
   {
-    name: 'list_records',
+    name: 'rootkey_list_records',
     title: 'List records',
     description:
       'List records in a table, newest first. Each row carries its own columns at the top level plus a ' +
@@ -96,7 +96,7 @@ export const recordTools: ToolDefinition[] = [
   },
 
   {
-    name: 'create_record',
+    name: 'rootkey_create_record',
     title: 'Create a record',
     description:
       'Write a record into a table. Records are versioned by primary key: posting a payload whose key column ' +
@@ -145,14 +145,14 @@ export const recordTools: ToolDefinition[] = [
             : matched === 'newest'
               ? 'The create call does not return an id. The newest row in the table is shown below as the ' +
                 'likely match - confirm it before acting on it.'
-              : 'The record was created but the follow-up lookup returned nothing. Use list_records to find it.',
+              : 'The record was created but the follow-up lookup returned nothing. Use rootkey_list_records to find it.',
         data: { ...(receipt as object), record, matched },
       };
     },
   },
 
   {
-    name: 'list_record_versions',
+    name: 'rootkey_list_record_versions',
     title: 'List record versions',
     description: 'List every version of a record, newest first.',
     readOnly: true,
@@ -174,7 +174,7 @@ export const recordTools: ToolDefinition[] = [
   },
 
   {
-    name: 'get_record_history',
+    name: 'rootkey_get_record_history',
     title: 'Get record activity history',
     description: 'Read the activity log for a record - the audit trail of who changed it and when.',
     readOnly: true,
@@ -196,7 +196,7 @@ export const recordTools: ToolDefinition[] = [
   },
 
   {
-    name: 'get_record_validations',
+    name: 'rootkey_get_record_validations',
     title: 'Get record validation history',
     description: 'List past integrity validations of a record, with the current and previous hashes.',
     readOnly: true,
@@ -217,10 +217,10 @@ export const recordTools: ToolDefinition[] = [
   },
 
   {
-    name: 'delete_record',
+    name: 'rootkey_delete_record',
     title: 'Delete a record',
     description:
-      'Delete a record. It moves to the trash: it stops appearing in list_records immediately, and stays ' +
+      'Delete a record. It moves to the trash: it stops appearing in rootkey_list_records immediately, and stays ' +
       'recoverable from the Restore Center in the ROOTKey dashboard until the retention policy purges it ' +
       'for good. Confirm with the user first.',
     destructive: true,
