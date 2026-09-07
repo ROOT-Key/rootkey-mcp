@@ -28,6 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24, not 22: trusted publishing needs npm >= 11.5.1 and Node 22 bundles npm
+      # 10.9.x, which has no OIDC handshake - it fails with a 404 that appears to blame the
+      # package rather than the CLI. Node 24 ships npm 11.x. Keep this at 24 or higher.
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
