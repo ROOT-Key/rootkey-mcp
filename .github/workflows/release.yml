@@ -3,10 +3,16 @@ name: Release
 # Publishing happens from CI, never from a laptop, so the tarball on the registry is always the
 # one this workflow built from a reviewed commit.
 #
+# Auth is npm Trusted Publishing (OIDC): npm exchanges this job's short-lived GitHub identity
+# token for a publish grant scoped to this repo and this workflow file. There is no long-lived
+# NPM_TOKEN to leak, and it satisfies the org's 2FA-on-write policy without a bypass-2FA token -
+# which matters, because npm stops honouring those for direct publishing in Jan 2027.
+#
 # Provenance is deliberately OFF: npm only accepts provenance attestations from public source
-# repositories, and this repo is private. Re-add `--provenance` (plus publishConfig.provenance)
-# the moment the repo goes public - the attestation is worth having for a package that handles
-# API keys and is sold on file integrity.
+# repositories, and this repo is private. Trusted publishing turns provenance ON by default, so
+# it has to be switched back off explicitly here. Drop NPM_CONFIG_PROVENANCE the moment the repo
+# goes public - the attestation is worth having for a package that handles API keys and is sold
+# on file integrity.
 on:
   release:
     types: [published]
@@ -28,6 +34,11 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # Trusted publishing needs npm >= 11.5.1; Node 22 still bundles npm 10.9.x, and the
+      # OIDC handshake is missing there. Without this step the publish fails with a 404 that
+      # blames the package rather than the CLI version.
+      - run: npm install -g npm@latest
+
       - run: npm ci
 
       - run: npm run typecheck
@@ -38,4 +49,4 @@ jobs:
 
       - run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: false
