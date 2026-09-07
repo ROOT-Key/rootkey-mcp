@@ -30,14 +30,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: https://registry.npmjs.org
           cache: npm
-
-      # Trusted publishing needs npm >= 11.5.1; Node 22 still bundles npm 10.9.x, and the
-      # OIDC handshake is missing there. Without this step the publish fails with a 404 that
-      # blames the package rather than the CLI version.
-      - run: npm install -g npm@latest
 
       - run: npm ci
 
