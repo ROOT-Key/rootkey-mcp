@@ -1,7 +1,12 @@
 name: Release
 
-# Publishing happens from CI, never from a laptop, so every published tarball carries an npm
-# provenance attestation linking it to the commit and workflow that built it.
+# Publishing happens from CI, never from a laptop, so the tarball on the registry is always the
+# one this workflow built from a reviewed commit.
+#
+# Provenance is deliberately OFF: npm only accepts provenance attestations from public source
+# repositories, and this repo is private. Re-add `--provenance` (plus publishConfig.provenance)
+# the moment the repo goes public - the attestation is worth having for a package that handles
+# API keys and is sold on file integrity.
 on:
   release:
     types: [published]
@@ -31,6 +36,6 @@ jobs:
 
       - run: npm test
 
-      - run: npm publish --provenance --access public
+      - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
