@@ -37,6 +37,37 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
+      # Both guards run before `npm ci`, so a wrong version number costs ~10s instead of a
+      # full build and test run. They query the registry over plain HTTPS rather than with
+      # `npm view`, because setup-node leaves an .npmrc pointing _authToken at an empty
+      # NODE_AUTH_TOKEN (auth comes from OIDC now) and npm commands can trip over that.
+      #
+      # The registry is immutable: a published version can never be replaced, so the only
+      # recovery from shipping the wrong number is spending another one.
+      - name: Refuse to republish a version already on the registry
+        run: |
+          name=$(node -p "require('./package.json').name.replace('/', '%2f')")
+          version=$(node -p "require('./package.json').version")
+          status=$(curl -sS -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/$name/$version")
+          case "$status" in
+            404) echo "$version is not on the registry yet - proceeding." ;;
+            200) echo "::error::$version is already published. Bump the version in package.json." ; exit 1 ;;
+            *)   echo "::error::Could not reach the registry to check $version (HTTP $status)." ; exit 1 ;;
+          esac
+
+      # A tag that disagrees with package.json publishes a version nobody asked for, and
+      # leaves the tag pointing at the wrong commit permanently.
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "v$version" ] && [ "$TAG" != "$version" ]; then
+            echo "::error::Release tag '$TAG' does not match package.json version '$version'."
+            exit 1
+          fi
+
       - run: npm ci
 
       - run: npm run typecheck
