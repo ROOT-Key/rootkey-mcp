@@ -2,9 +2,8 @@ import { LOG_LEVELS, type LogLevel } from './log.js';
 import { defaultAllowedRoots, parseAllowedRoots } from './paths.js';
 
 export const PRODUCTION_BASE_URL = 'https://api.rootkey.ai/api-v1/';
-export const DEVELOPMENT_BASE_URL = 'https://dev-api.rootkey.ai/api-v1/';
 
-export type Environment = 'production' | 'development' | 'custom';
+export type Environment = 'production' | 'custom';
 export type KeyMode = 'live' | 'test' | 'unknown';
 
 export interface Config {
@@ -19,6 +18,8 @@ export interface Config {
   /** Absolute roots that rootkey_upload_file, rootkey_upload_file_version and rootkey_validate_file may read from. */
   allowedRoots: string[];
   logLevel: LogLevel;
+  /** Non-fatal notices about the environment, for the caller to print once the log level is known. */
+  warnings: string[];
 }
 
 export class ConfigError extends Error {
@@ -77,7 +78,6 @@ function isLoopback(hostname: string): boolean {
 
 function resolveEnvironment(baseUrl: string): Environment {
   if (baseUrl === PRODUCTION_BASE_URL) return 'production';
-  if (baseUrl === DEVELOPMENT_BASE_URL) return 'development';
   return 'custom';
 }
 
@@ -93,22 +93,38 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!apiKey) {
     throw new ConfigError(
       'ROOTKEY_API_KEY is not set. Create an API key in the ROOTKey dashboard under ' +
-        'Platform -> Developer Tools -> API Keys, then pass it to the server as the ' +
+        'Developer Tools -> API Keys, then pass it to the server as the ' +
         'ROOTKEY_API_KEY environment variable.',
     );
   }
 
   const explicitUrl = env.ROOTKEY_API_URL?.trim();
   const requestedEnv = env.ROOTKEY_ENV?.trim().toLowerCase();
-  if (requestedEnv && !['production', 'development'].includes(requestedEnv)) {
-    throw new ConfigError(`ROOTKEY_ENV must be "production" or "development", got "${requestedEnv}".`);
+  const warnings: string[] = [];
+  if (requestedEnv === 'development' && explicitUrl) {
+    // 0.1.0 documented ROOTKEY_API_URL as overriding ROOTKEY_ENV, so a self-hosted setup may carry both.
+    // The URL is used exactly as before; the stale variable only earns a notice, not a startup failure.
+    warnings.push(
+      'ROOTKEY_ENV is set to a value that is obsolete (there is no public development environment) and is ' +
+        'ignored because ROOTKEY_API_URL is set; you can remove ROOTKEY_ENV.',
+    );
+  } else if (requestedEnv === 'development') {
+    // 0.1.0 accepted this and pointed at a host that does not exist, so people may still have it set.
+    // Fail loudly with the real alternatives rather than ignoring it.
+    throw new ConfigError(
+      'ROOTKEY_ENV: there is no public development environment. ROOTKey has one public API, the production API ' +
+        `(${PRODUCTION_BASE_URL}); a test key works against it and keeps its data separate from live data, ` +
+        'so remove ROOTKEY_ENV (keep ROOTKEY_API_URL if you set it for a self-hosted or on-prem deployment).',
+    );
+  }
+  if (requestedEnv && requestedEnv !== 'production' && requestedEnv !== 'development') {
+    throw new ConfigError(
+      `ROOTKEY_ENV must be "production" (or left unset), got "${requestedEnv}". ` +
+        'For a self-hosted or on-prem deployment, set ROOTKEY_API_URL instead.',
+    );
   }
 
-  const baseUrl = explicitUrl
-    ? normalizeBaseUrl(explicitUrl)
-    : requestedEnv === 'development'
-      ? DEVELOPMENT_BASE_URL
-      : PRODUCTION_BASE_URL;
+  const baseUrl = explicitUrl ? normalizeBaseUrl(explicitUrl) : PRODUCTION_BASE_URL;
 
   const rawLogLevel = env.ROOTKEY_LOG_LEVEL?.trim().toLowerCase();
   if (rawLogLevel && !LOG_LEVELS.includes(rawLogLevel as LogLevel)) {
@@ -131,5 +147,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     downloadDir: downloadDir && downloadDir.length > 0 ? downloadDir : undefined,
     allowedRoots: parseAllowedRoots(env.ROOTKEY_ALLOWED_DIRS) ?? defaultAllowedRoots(),
     logLevel: (rawLogLevel as LogLevel | undefined) ?? 'info',
+    warnings,
   };
 }

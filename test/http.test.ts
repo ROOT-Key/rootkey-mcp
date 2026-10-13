@@ -99,7 +99,11 @@ describe('error mapping', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error.message).toContain('ROOTKEY_API_KEY');
-    expect(error.message).toContain('rk_test_');
+    // There is one public API; the message must not send the model hunting for a development host or
+    // claim that the key prefix decides which environment is called.
+    expect(error.message).not.toMatch(/development/i);
+    expect(error.message).not.toMatch(/dev-api/i);
+    expect(error.message).not.toMatch(/only work/i);
   });
 
   it('explains a 403 on a plan-gated endpoint', async () => {
