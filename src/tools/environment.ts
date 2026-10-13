@@ -13,8 +13,8 @@ export function environmentTools(toolCount: () => number): ToolDefinition[] {
       name: 'rootkey_get_environment_info',
       title: 'Get server environment info',
       description:
-        'Report how this ROOTKey MCP server is configured: version, API base URL, environment, whether the ' +
-        'configured key is a live or test key, read-only mode and the number of registered tools. Makes no ' +
+        'Report how this ROOTKey MCP server is configured: version, API base URL, environment, the key mode ' +
+        'when the key prefix reveals it, read-only mode and the number of registered tools. Makes no ' +
         'API call and never reveals the API key.',
       readOnly: true,
       local: true,
@@ -23,8 +23,8 @@ export function environmentTools(toolCount: () => number): ToolDefinition[] {
       outputSchema: z.object({
         serverVersion: z.string(),
         baseUrl: z.string(),
-        environment: z.enum(['production', 'development', 'custom']),
-        keyMode: z.enum(['live', 'test', 'unknown']).describe('Derived from the key prefix; the key itself is never exposed.'),
+        environment: z.enum(['production', 'custom']),
+        keyMode: z.enum(['live', 'test', 'unknown']).describe("'live' or 'test' only when the key carries an rk_live_ or rk_test_ prefix; 'unknown' otherwise (existing keys are plain UUIDs, so unknown does not mean invalid). The key itself is never exposed."),
         readOnlyMode: z.boolean(),
         registeredTools: z.number(),
       }),

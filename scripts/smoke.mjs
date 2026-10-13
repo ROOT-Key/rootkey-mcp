@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 /**
- * Live round trip against a real ROOTKey environment, driving the built server exactly as a
- * client does (spawned process, MCP over stdio). Creates a vault, exercises files and records,
- * then deletes everything it made.
+ * Live round trip against a real ROOTKey deployment (the public API unless ROOTKEY_API_URL is set),
+ * driving the built server exactly as a client does (spawned process, MCP over stdio). Creates a
+ * vault, exercises files and records, then deletes everything it made.
  *
  * Guarded on purpose - it writes real data and consumes plan quota:
  *
- *   ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=rk_test_... ROOTKEY_ENV=development npm run smoke
+ *   ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=<a test key> npm run smoke
+ *
+ * There is no separate development API: the key decides whether this touches test or live data, so use a
+ * test key (without an rk_test_ prefix, confirm with ROOTKEY_SMOKE_ALLOW_LIVE=1). Set ROOTKEY_API_URL to run it against a self-hosted deployment.
  */
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,11 +25,16 @@ if (process.env.ROOTKEY_SMOKE !== '1') {
   process.exit(2);
 }
 if (!process.env.ROOTKEY_API_KEY) {
-  console.error('Set ROOTKEY_API_KEY (use an rk_test_ key with ROOTKEY_ENV=development).');
+  console.error('Set ROOTKEY_API_KEY (use a test key: the smoke run writes real data).');
   process.exit(2);
 }
-if (process.env.ROOTKEY_API_KEY.startsWith('rk_live_') && process.env.ROOTKEY_SMOKE_ALLOW_LIVE !== '1') {
-  console.error('That is a production key. Re-run with ROOTKEY_SMOKE_ALLOW_LIVE=1 if you really mean it.');
+// Existing keys are plain UUIDs, so the script cannot tell a test key from a live one unless the key
+// carries the rk_test_ prefix. Anything else needs an explicit acknowledgement.
+if (!process.env.ROOTKEY_API_KEY.startsWith('rk_test_') && process.env.ROOTKEY_SMOKE_ALLOW_LIVE !== '1') {
+  console.error(
+    'Cannot tell from this key whether it works on test or live data, and the smoke run creates and deletes real data. ' +
+      'If it is a test key, re-run with ROOTKEY_SMOKE_ALLOW_LIVE=1.',
+  );
   process.exit(2);
 }
 
@@ -38,7 +46,6 @@ await client.connect(
     env: {
       PATH: process.env.PATH ?? '',
       ROOTKEY_API_KEY: process.env.ROOTKEY_API_KEY,
-      ROOTKEY_ENV: process.env.ROOTKEY_ENV ?? 'development',
       ...(process.env.ROOTKEY_API_URL ? { ROOTKEY_API_URL: process.env.ROOTKEY_API_URL } : {}),
       ROOTKEY_LOG_LEVEL: process.env.ROOTKEY_LOG_LEVEL ?? 'warn',
     },

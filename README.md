@@ -7,7 +7,7 @@ It is a thin translation layer. Every tool call is a real API request made with 
 ## Requirements
 
 - Node.js 20 or newer
-- A ROOTKey API key, from the dashboard under **Platform -> Developer Tools -> API Keys**
+- A ROOTKey API key, from the dashboard under **Developer Tools -> API Keys**
 
 ## Install
 
@@ -22,7 +22,7 @@ https://docs.rootkey.ai/agent-setup/prompt.md
 ### Claude Code
 
 ```bash
-claude mcp add rootkey --env ROOTKEY_API_KEY=rk_live_your_key -- npx -y @rootkey/mcp
+claude mcp add rootkey --env ROOTKEY_API_KEY=your_api_key -- npx -y @rootkey/mcp
 ```
 
 ### Claude Desktop
@@ -35,7 +35,7 @@ Add this to `claude_desktop_config.json` (Settings -> Developer -> Edit Config):
     "rootkey": {
       "command": "npx",
       "args": ["-y", "@rootkey/mcp"],
-      "env": { "ROOTKEY_API_KEY": "rk_live_your_key" }
+      "env": { "ROOTKEY_API_KEY": "your_api_key" }
     }
   }
 }
@@ -49,7 +49,7 @@ On Windows, route the command through `cmd` so `npx` resolves:
     "rootkey": {
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@rootkey/mcp"],
-      "env": { "ROOTKEY_API_KEY": "rk_live_your_key" }
+      "env": { "ROOTKEY_API_KEY": "your_api_key" }
     }
   }
 }
@@ -76,8 +76,8 @@ Commit a `.mcp.json` at the root of your repository and let each person supply t
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `ROOTKEY_API_KEY` | required | Your ROOTKey API key. The server exits immediately if it is missing. |
-| `ROOTKEY_ENV` | `production` | `production` or `development`. Picks the matching API base URL. |
-| `ROOTKEY_API_URL` | - | Full base URL, including the `/api-v1/` path. Overrides `ROOTKEY_ENV`. Plain `http://` is accepted only for loopback hosts. |
+| `ROOTKEY_ENV` | `production` | Optional, and `production` is the only accepted value. ROOTKey has one public API, `https://api.rootkey.ai/api-v1/`; see below. |
+| `ROOTKEY_API_URL` | - | Full base URL, including the `/api-v1/` path. Use it for a self-hosted or on-prem deployment. Plain `http://` is accepted only for loopback hosts. |
 | `ROOTKEY_READ_ONLY` | `false` | When true, only the 15 read tools are registered, and downloads may only write inside `ROOTKEY_DOWNLOAD_DIR`. |
 | `ROOTKEY_TIMEOUT_MS` | `30000` | Timeout for ordinary requests. |
 | `ROOTKEY_TRANSFER_TIMEOUT_MS` | `300000` | Timeout for uploads and downloads. |
@@ -85,7 +85,7 @@ Commit a `.mcp.json` at the root of your repository and let each person supply t
 | `ROOTKEY_ALLOWED_DIRS` | home, temp, cwd | Directories uploads may read from, separated by `;` on Windows and `:` elsewhere. |
 | `ROOTKEY_LOG_LEVEL` | `info` | `silent`, `error`, `warn`, `info` or `debug`. Logs go to stderr. |
 
-Use an `rk_test_` key with `ROOTKEY_ENV=development` while you are trying things out: the development environment anchors nothing on Polygon Mainnet and costs no credits.
+There is one public API, `https://api.rootkey.ai/api-v1/`, and no separate development environment. Whether you work on test or live data is a property of the API key, not of a host: a test key operates on your organization's test data, a live key on its live data, and the two data sets are separate. If you want to try things out, use a test key. The `development` value of `ROOTKEY_ENV` that 0.1.0 accepted pointed at a host that does not exist, so it is now obsolete: the server refuses to start with it and explains why, unless `ROOTKEY_API_URL` is set, in which case the URL is used as before and a warning goes to stderr. Remove the variable. For a self-hosted or on-prem deployment, point `ROOTKEY_API_URL` at it.
 
 ## Tools
 
@@ -147,14 +147,16 @@ npm test
 Inspect the built server with the MCP Inspector (it does not inherit your shell environment, so pass the key with `-e`):
 
 ```bash
-npx @modelcontextprotocol/inspector --cli node dist/index.js -e ROOTKEY_API_KEY=rk_test_your_key --method tools/list
+npx @modelcontextprotocol/inspector --cli node dist/index.js -e ROOTKEY_API_KEY=your_test_api_key --method tools/list
 ```
 
 There is also a live round trip that creates a vault, exercises files and records, and deletes everything it made. It writes real data, so it is opt-in:
 
 ```bash
-ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=rk_test_your_key ROOTKEY_ENV=development npm run smoke
+ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=your_test_api_key npm run smoke
 ```
+
+The script cannot tell a test key from a live one unless the key starts with `rk_test_`; for any other key it refuses to run until you confirm it is a test key by also setting `ROOTKEY_SMOKE_ALLOW_LIVE=1`.
 
 ## Support
 

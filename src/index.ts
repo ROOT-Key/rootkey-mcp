@@ -7,6 +7,7 @@ import { SERVER_VERSION } from './version.js';
 async function main(): Promise<void> {
   const config = loadConfig();
   setLogLevel(config.logLevel);
+  for (const warning of config.warnings) log.warn(warning);
 
   const { server, toolNames, promptNames } = buildServer(config);
 

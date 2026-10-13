@@ -80,9 +80,8 @@ function defaultMessageForStatus(status: number, rawText: string): string {
   switch (status) {
     case 401:
       return (
-        'Unauthenticated. Check that ROOTKEY_API_KEY holds a valid key and that it matches the ' +
-        'environment you are calling: rk_test_ keys only work against the development API, ' +
-        'rk_live_ keys only against production.'
+        'Unauthenticated. Check that ROOTKEY_API_KEY holds a valid, active API key. There is one public ' +
+        'ROOTKey API; the key decides whether you operate on test or live data.'
       );
     case 403:
       return (
