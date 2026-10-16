@@ -67,6 +67,24 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
   };
 }
 
+/** A well-formed personal access token (rk_pat_ + 64 hex). Not a real credential. */
+export const TEST_PAT = `rk_pat_${'0123456789abcdef'.repeat(4)}`;
+
+/** Two organization ids, standing in for what rootkey_list_organizations returns. */
+export const ORG_A = '11111111-1111-4111-8111-111111111111';
+export const ORG_B = '22222222-2222-4222-8222-222222222222';
+
+/**
+ * A personal access token configuration. Built through loadConfig, like testConfig, so the config matrix and
+ * the tools exercise the same code that a real start-up does.
+ */
+export function patConfig(env: Record<string, string> = {}, overrides: Partial<Config> = {}): Config {
+  return {
+    ...loadConfig({ ROOTKEY_TOKEN: TEST_PAT, ROOTKEY_LOG_LEVEL: 'silent', ...env } as NodeJS.ProcessEnv),
+    ...overrides,
+  };
+}
+
 /** Connects a real MCP client to the real server over an in-memory transport pair. */
 export async function connectTestClient(config: Config = testConfig()): Promise<{
   client: Client;

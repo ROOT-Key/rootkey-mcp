@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectTestClient, testConfig } from './helpers.js';
+import { connectTestClient, patConfig, testConfig } from './helpers.js';
 
 describe('prompts', () => {
   it('offers the four workflows, and declares the prompts capability', async () => {
@@ -28,6 +28,39 @@ describe('prompts', () => {
     try {
       const { prompts } = await client.listPrompts();
       expect(prompts.map((prompt) => prompt.name)).toEqual(['compliance_evidence_pack']);
+    } finally {
+      await close();
+    }
+  });
+
+  // The workflow is built on recovery points, which the API refuses to every delegated credential: offering it to a
+  // personal access token would start a job that cannot get past its first step.
+  it('does not offer the backup workflow to a personal access token, and still offers it to an organization API key', async () => {
+    const token = await connectTestClient(patConfig());
+    const orgKey = await connectTestClient(testConfig());
+    try {
+      const forToken = (await token.client.listPrompts()).prompts.map((prompt) => prompt.name).sort();
+      const forKey = (await orgKey.client.listPrompts()).prompts.map((prompt) => prompt.name);
+
+      expect(forToken).toEqual(['anchor_folder', 'compliance_evidence_pack', 'verify_local_copies']);
+      expect(forKey).toContain('backup_workspace');
+    } finally {
+      await token.close();
+      await orgKey.close();
+    }
+  });
+
+  it('only names tools that the credential it is offered to has', async () => {
+    const { client, close } = await connectTestClient(patConfig());
+    try {
+      const tools = new Set((await client.listTools()).tools.map((tool) => tool.name));
+      for (const prompt of (await client.listPrompts()).prompts) {
+        const args = Object.fromEntries((prompt.arguments ?? []).map((arg) => [arg.name, 'x']));
+        const text = JSON.stringify((await client.getPrompt({ name: prompt.name, arguments: args })).messages);
+        for (const name of text.match(/rootkey_[a-z_]+/g) ?? []) {
+          expect(tools.has(name), `${prompt.name} names ${name}`).toBe(true);
+        }
+      }
     } finally {
       await close();
     }

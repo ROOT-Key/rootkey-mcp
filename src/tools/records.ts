@@ -5,6 +5,7 @@ import { normalizePage } from '../normalize.js';
 import type { RecordRow } from '../types.js';
 import {
   isoDateTime,
+  listAddressable,
   optionalString,
   pageOutputSchema,
   pagedQuery,
@@ -61,6 +62,20 @@ async function findCreatedRecord(
 }
 
 export const recordTools: ToolDefinition[] = [
+  {
+    name: 'rootkey_list_tables',
+    title: 'List tables',
+    description:
+      'List the tables (the containers that hold records) you can see in the organization, newest first. Returns ' +
+      'each table address, name, classification and status; the address is what the record tools take as ' +
+      'vaultAddress. A RESTRICTED table is listed with agentAccessible false and cannot be read or changed by an ' +
+      'agent. Vaults, which hold files, come from rootkey_list_vaults.',
+    readOnly: true,
+    inputSchema: { ...paginationArgs },
+    outputSchema: pageOutputSchema,
+    handler: (args, ctx, extra) => listAddressable(ctx, 'tables', args, extra.signal),
+  },
+
   {
     name: 'rootkey_list_records',
     title: 'List records',

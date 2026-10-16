@@ -7,6 +7,7 @@ import { unwrap } from '../normalize.js';
 import type { RecoveryPoint } from '../types.js';
 import {
   isoDateTime,
+  normalizeAddress,
   optionalString,
   readOnlyWriteRoot,
   requireString,
@@ -50,6 +51,7 @@ async function findCreatedRecoveryPoint(
 export const recoveryTools: ToolDefinition[] = [
   {
     name: 'rootkey_list_recovery_points',
+    blockedForAgents: true,
     title: 'List recovery points',
     description: 'List every recovery point (encrypted backup archive) in the workspace. This endpoint is not paginated.',
     readOnly: true,
@@ -66,6 +68,7 @@ export const recoveryTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_create_recovery_point',
+    blockedForAgents: true,
     title: 'Create a recovery point',
     description:
       'Start building an encrypted backup archive of vault contents, either the whole workspace (global) or ' +
@@ -77,7 +80,10 @@ export const recoveryTools: ToolDefinition[] = [
     inputSchema: {
       name: z.string().min(1).describe('Name for the recovery point.'),
       scope: z.enum(['global', 'partial']).describe('"global" covers everything; "partial" covers the listed vaults.'),
-      vaults: z.array(z.string()).optional().describe('Vault addresses to include. Required when scope is "partial".'),
+      vaults: z
+        .array(z.string().transform(normalizeAddress))
+        .optional()
+        .describe('Vault addresses to include. Required when scope is "partial". Letter case does not matter.'),
       timeRangeStart: isoDateTime.optional().describe('Only include content created at or after this timestamp.'),
       timeRangeEnd: isoDateTime.optional().describe('Only include content created at or before this timestamp.'),
     },
@@ -123,6 +129,7 @@ export const recoveryTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_get_recovery_point',
+    blockedForAgents: true,
     title: 'Get recovery point status',
     description:
       'Fetch one recovery point to follow its build: status (enqueued, processing, completed, failed), ' +
@@ -143,6 +150,7 @@ export const recoveryTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_wait_for_recovery_point',
+    blockedForAgents: true,
     title: 'Wait for a recovery point to finish building',
     description:
       'Poll a recovery point until it reports "completed" or "failed", then return it. Use this instead ' +
@@ -223,6 +231,7 @@ export const recoveryTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_download_recovery_point',
+    blockedForAgents: true,
     title: 'Download a recovery point archive',
     description:
       'Download the encrypted archive to the local disk of the machine running this server. Only works once ' +
@@ -271,6 +280,7 @@ export const recoveryTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_delete_recovery_point',
+    blockedForAgents: true,
     title: 'Delete a recovery point',
     description:
       'Permanently delete a recovery point and the encrypted archive behind it. Unlike deleting a vault, ' +

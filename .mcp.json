@@ -4,7 +4,7 @@
       "command": "node",
       "args": ["dist/index.js"],
       "env": {
-        "ROOTKEY_API_KEY": "${ROOTKEY_API_KEY}"
+        "ROOTKEY_TOKEN": "${ROOTKEY_TOKEN}"
       }
     }
   }

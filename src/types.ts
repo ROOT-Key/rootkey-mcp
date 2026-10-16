@@ -36,6 +36,17 @@ export interface RecoveryPoint {
   [key: string]: unknown;
 }
 
+/** A row of `GET /organizations`: what a personal access token may act in, and how far. */
+export interface OrganizationSummary {
+  id?: string;
+  name?: string;
+  /** The organization agent policy: DISABLED, READ_ONLY or FULL. */
+  mode?: string;
+  /** True when an admin of that organization has blocked this user from agent access. */
+  blocked?: boolean;
+  [key: string]: unknown;
+}
+
 export interface CreateVaultResponse {
   chainId?: number;
   address?: string;
