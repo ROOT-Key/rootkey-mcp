@@ -4,9 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { apiErrorFromBody } from '../src/errors.js';
-import { SERVER_INSTRUCTIONS } from '../src/server.js';
+import { serverInstructions } from '../src/server.js';
 import { SERVER_VERSION } from '../src/version.js';
-import { connectTestClient } from './helpers.js';
+import { connectTestClient, patConfig } from './helpers.js';
 
 /**
  * There is no public development environment. One public API (https://api.rootkey.ai/api-v1/) serves
@@ -107,18 +107,85 @@ describe('README accuracy', () => {
   });
 });
 
+describe('README for 0.2.0', () => {
+  const readme = read('README.md');
+
+  it('documents the personal access token, its settings page and the three new variables', () => {
+    for (const needle of ['ROOTKEY_TOKEN', 'ROOTKEY_ORGANIZATION', 'ROOTKEY_TEST_MODE', 'Settings -> Personal access tokens', 'rk_pat_']) {
+      expect(readme, needle).toContain(needle);
+    }
+  });
+
+  it('says the organization API key is deprecated and when it goes', () => {
+    const row = readme.split(/\r?\n/).find((line) => line.startsWith('| `ROOTKEY_API_KEY`')) ?? '';
+    expect(row).toMatch(/deprecated/i);
+    expect(row).toContain('0.3.0');
+    expect(readme).toContain('Migrating from an organization API key');
+  });
+
+  it('lists every tool either credential is offered, by name, with the counts that are true', async () => {
+    const orgKey = await connectTestClient();
+    const token = await connectTestClient(patConfig());
+    try {
+      const names = new Set([
+        ...(await orgKey.client.listTools()).tools.map((tool) => tool.name),
+        ...(await token.client.listTools()).tools.map((tool) => tool.name),
+      ]);
+      expect(names.size).toBe(30);
+      for (const name of names) expect(readme, name).toContain(name);
+
+      expect((await orgKey.client.listTools()).tools).toHaveLength(29);
+      expect((await token.client.listTools()).tools).toHaveLength(23);
+      expect(readme).toContain('30 tools in all');
+      expect(readme).toContain('A personal access token gets 23');
+      expect(readme).toContain('An organization API key gets 29');
+      expect(readme).toContain('14 with a personal access token, 17 with an organization API key');
+    } finally {
+      await orgKey.close();
+      await token.close();
+    }
+  });
+
+  it('says that a token is not offered recovery points or audit reports, and why', () => {
+    expect(readme).toContain('does not register the recovery point tools');
+    expect(readme).toContain('backup_workspace');
+    expect(readme).toMatch(/Recovery points\*\* \(organization API key only\)/);
+  });
+
+  it('says rootkey_update_vault is destructive and that results are data', () => {
+    expect(readme).toContain('`rootkey_update_vault` (which overwrites the previous name or description) are destructive');
+    expect(readme).toContain('**Results are data.**');
+  });
+
+  it('never puts the token on a command line in an example', () => {
+    expect(readme).not.toMatch(/ROOTKEY_TOKEN=your_personal_access_token\s+--/);
+    expect(readme).not.toMatch(/-e ROOTKEY_TOKEN=your_/);
+  });
+
+  it('no longer claims the API has no endpoint that lists vaults', () => {
+    expect(readme).not.toMatch(/no endpoint that lists vaults/i);
+  });
+
+  it('is honest about what organization policy governs', () => {
+    expect(readme).toMatch(/not "the AI"/);
+    expect(readme).toContain('RESTRICTED');
+    expect(readme).toContain('agentAccessible');
+  });
+});
+
 describe('model-facing text', () => {
   const claimsPrefixDecidesEnvironment =
     /\brk_(test|live)_\S*\s+(keys?\s+)?(only\s+)?(work|works|need|needs|require|requires|run|runs|against|belong)/i;
 
-  it('server instructions never invent a development API or tie the key prefix to the environment', () => {
-    expect(SERVER_INSTRUCTIONS).not.toMatch(/development/i);
-    expect(SERVER_INSTRUCTIONS).not.toMatch(/dev-api/i);
-    expect(SERVER_INSTRUCTIONS).not.toMatch(claimsPrefixDecidesEnvironment);
+  it.each(['pat', 'api_key'] as const)('server instructions (%s) never invent a development API or tie the key prefix to the environment', (kind) => {
+    const instructions = serverInstructions(kind);
+    expect(instructions).not.toMatch(/development/i);
+    expect(instructions).not.toMatch(/dev-api/i);
+    expect(instructions).not.toMatch(claimsPrefixDecidesEnvironment);
   });
 
-  it('server instructions still point the model at the environment diagnostic', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('rootkey_get_environment_info');
+  it.each(['pat', 'api_key'] as const)('server instructions (%s) still point the model at the environment diagnostic', (kind) => {
+    expect(serverInstructions(kind)).toContain('rootkey_get_environment_info');
   });
 
   it('401 guidance never claims test keys need a development API', () => {
@@ -167,17 +234,17 @@ describe('model-facing text', () => {
   });
 });
 
-describe('release 0.1.1', () => {
+describe('release 0.2.0', () => {
   it('has the same version in package.json, package-lock.json (both root fields) and the server', () => {
     const pkg = JSON.parse(read('package.json')) as { version: string };
     const lock = JSON.parse(read('package-lock.json')) as {
       version: string;
       packages: Record<string, { version: string }>;
     };
-    expect(pkg.version).toBe('0.1.1');
-    expect(lock.version).toBe('0.1.1');
-    expect(lock.packages['']?.version).toBe('0.1.1');
-    expect(SERVER_VERSION).toBe('0.1.1');
+    expect(pkg.version).toBe('0.2.0');
+    expect(lock.version).toBe('0.2.0');
+    expect(lock.packages['']?.version).toBe('0.2.0');
+    expect(SERVER_VERSION).toBe('0.2.0');
   });
 });
 
@@ -197,9 +264,9 @@ describe('built bundle (dist/index.js)', () => {
     expect(bundle).not.toMatch(/ROOTKEY_ENV=development/i);
   });
 
-  it('carries the 0.1.1 version string', () => {
+  it('carries the 0.2.0 version string', () => {
     const bundle = readFileSync(bundlePath, 'utf8');
-    expect(bundle).toContain('0.1.1');
+    expect(bundle).toContain('0.2.0');
     expect(bundle).not.toMatch(/SERVER_VERSION\s*=\s*["']0\.1\.0["']/);
   });
 });
@@ -215,5 +282,27 @@ describe('smoke script guard', () => {
     });
     expect(result.status).toBe(2);
     expect(result.stderr).toMatch(/test or live/i);
+  });
+
+  // A personal access token reaches several organizations and defaults to live data: the run must be told both.
+  it('refuses a personal access token without an organization', () => {
+    const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'smoke.mjs')], {
+      env: { PATH: process.env.PATH ?? '', ROOTKEY_SMOKE: '1', ROOTKEY_TOKEN: `rk_pat_${'0'.repeat(64)}`, ROOTKEY_TEST_MODE: 'true' },
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('ROOTKEY_ORGANIZATION');
+  });
+
+  it('refuses a personal access token that would write to live data without ROOTKEY_SMOKE_ALLOW_LIVE', () => {
+    const result = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'smoke.mjs')], {
+      env: { PATH: process.env.PATH ?? '', ROOTKEY_SMOKE: '1', ROOTKEY_TOKEN: `rk_pat_${'0'.repeat(64)}`, ROOTKEY_ORGANIZATION: 'org-1' },
+      encoding: 'utf8',
+      timeout: 15_000,
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('ROOTKEY_TEST_MODE=true');
+    expect(result.stderr).toMatch(/live data/i);
   });
 });

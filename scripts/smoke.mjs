@@ -6,10 +6,16 @@
  *
  * Guarded on purpose - it writes real data and consumes plan quota:
  *
- *   ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=<a test key> npm run smoke
+ *   ROOTKEY_SMOKE=1 ROOTKEY_TOKEN=<a personal access token> ROOTKEY_ORGANIZATION=<org id> ROOTKEY_TEST_MODE=true npm run smoke
+ *   ROOTKEY_SMOKE=1 ROOTKEY_API_KEY=<a test key> npm run smoke        (deprecated organization API key)
  *
- * There is no separate development API: the key decides whether this touches test or live data, so use a
- * test key (without an rk_test_ prefix, confirm with ROOTKEY_SMOKE_ALLOW_LIVE=1). Set ROOTKEY_API_URL to run it against a self-hosted deployment.
+ * There is no separate public API for testing: the credential decides whether this touches test or live data. A
+ * personal access token needs ROOTKEY_ORGANIZATION and ROOTKEY_TEST_MODE=true; an organization API key without an
+ * rk_test_ prefix needs ROOTKEY_SMOKE_ALLOW_LIVE=1. Set ROOTKEY_API_URL to run it against a self-hosted deployment.
+ *
+ * A personal access token must carry rootkey.read, rootkey.write and rootkey.delete and cover that organization,
+ * and the organization's agent policy must be FULL: the run writes and then deletes. Recovery points are refused to
+ * agents by the API, so under a token the server does not offer them and this script does not touch them.
  */
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -24,13 +30,28 @@ if (process.env.ROOTKEY_SMOKE !== '1') {
   console.error('Refusing to run: set ROOTKEY_SMOKE=1 to confirm you want live API writes.');
   process.exit(2);
 }
-if (!process.env.ROOTKEY_API_KEY) {
-  console.error('Set ROOTKEY_API_KEY (use a test key: the smoke run writes real data).');
+const usingToken = Boolean(process.env.ROOTKEY_TOKEN);
+if (!usingToken && !process.env.ROOTKEY_API_KEY) {
+  console.error('Set ROOTKEY_TOKEN (a personal access token) or ROOTKEY_API_KEY (deprecated); the smoke run writes real data.');
   process.exit(2);
 }
-// Existing keys are plain UUIDs, so the script cannot tell a test key from a live one unless the key
-// carries the rk_test_ prefix. Anything else needs an explicit acknowledgement.
-if (!process.env.ROOTKEY_API_KEY.startsWith('rk_test_') && process.env.ROOTKEY_SMOKE_ALLOW_LIVE !== '1') {
+if (usingToken) {
+  // A token reaches every organization it covers, so the run must be told which one it may write in, and
+  // whether that is the test data or the live data.
+  if (!process.env.ROOTKEY_ORGANIZATION) {
+    console.error('Set ROOTKEY_ORGANIZATION: the smoke run will not pick an organization to write in.');
+    process.exit(2);
+  }
+  if (process.env.ROOTKEY_TEST_MODE?.trim().toLowerCase() !== 'true' && process.env.ROOTKEY_SMOKE_ALLOW_LIVE !== '1') {
+    console.error(
+      'This token would write to live data unless ROOTKEY_TEST_MODE=true, and the smoke run creates and deletes real data. ' +
+        'Set ROOTKEY_TEST_MODE=true, or re-run with ROOTKEY_SMOKE_ALLOW_LIVE=1 if live data is what you want.',
+    );
+    process.exit(2);
+  }
+} else if (!process.env.ROOTKEY_API_KEY.startsWith('rk_test_') && process.env.ROOTKEY_SMOKE_ALLOW_LIVE !== '1') {
+  // Existing keys are plain UUIDs, so the script cannot tell a test key from a live one unless the key
+  // carries the rk_test_ prefix. Anything else needs an explicit acknowledgement.
   console.error(
     'Cannot tell from this key whether it works on test or live data, and the smoke run creates and deletes real data. ' +
       'If it is a test key, re-run with ROOTKEY_SMOKE_ALLOW_LIVE=1.',
@@ -45,7 +66,13 @@ await client.connect(
     args: [BUNDLE],
     env: {
       PATH: process.env.PATH ?? '',
-      ROOTKEY_API_KEY: process.env.ROOTKEY_API_KEY,
+      ...(usingToken
+        ? {
+            ROOTKEY_TOKEN: process.env.ROOTKEY_TOKEN,
+            ROOTKEY_ORGANIZATION: process.env.ROOTKEY_ORGANIZATION,
+            ...(process.env.ROOTKEY_TEST_MODE ? { ROOTKEY_TEST_MODE: process.env.ROOTKEY_TEST_MODE } : {}),
+          }
+        : { ROOTKEY_API_KEY: process.env.ROOTKEY_API_KEY }),
       ...(process.env.ROOTKEY_API_URL ? { ROOTKEY_API_URL: process.env.ROOTKEY_API_URL } : {}),
       ROOTKEY_LOG_LEVEL: process.env.ROOTKEY_LOG_LEVEL ?? 'warn',
     },
@@ -66,13 +93,27 @@ async function call(name, args = {}) {
     throw new Error(`${name} failed`);
   }
   console.log('ok');
-  const jsonStart = text.lastIndexOf('{');
-  return jsonStart >= 0 ? JSON.parse(text.slice(jsonStart)) : {};
+  // The payload is always the last text block; a notice, when there is one, comes before it. Parsing from the
+  // last "{" would pick out a nested object, which the personal access token diagnostic now has.
+  const last = [...result.content].reverse().find((part) => part.type === 'text');
+  try {
+    return last ? JSON.parse(last.text) : {};
+  } catch {
+    return {};
+  }
 }
 
 try {
   const env = await call('rootkey_get_environment_info');
-  console.log(`    ${env.environment} at ${env.baseUrl} (${env.keyMode} key, ${env.registeredTools} tools)`);
+  console.log(
+    usingToken
+      ? `    ${env.environment} at ${env.baseUrl} (personal access token of ${env.user?.email ?? 'unknown user'}, ${env.dataMode} data, ${env.registeredTools} tools)`
+      : `    ${env.environment} at ${env.baseUrl} (${env.keyMode} key, ${env.registeredTools} tools)`,
+  );
+  if (usingToken && !env.organization) throw new Error(`the organization was not usable: ${env.organizationError ?? 'none selected'}`);
+
+  await call('rootkey_list_vaults', { limit: 5 });
+  await call('rootkey_list_tables', { limit: 5 });
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const vault = await call('rootkey_create_vault', {
@@ -116,7 +157,8 @@ try {
   if (recordId) cleanup.unshift(() => call('rootkey_delete_record', { recordId, vaultAddress }));
 
   await call('rootkey_list_records', { vaultAddress, limit: 5 });
-  await call('rootkey_list_recovery_points');
+  // The API refuses recovery points to a personal access token, and the server then does not register the tool.
+  if (!usingToken) await call('rootkey_list_recovery_points');
 
   console.log('\nAll steps passed. Cleaning up.');
 } catch (error) {

@@ -1,6 +1,6 @@
 {
   "name": "@rootkey/mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Official ROOTKey MCP server - operate vaults, files, records and recovery points from Claude",
   "license": "MIT",
   "author": "ROOTKey <support@rootkey.ai> (https://rootkey.ai)",

@@ -12,6 +12,10 @@ import { SERVER_VERSION } from '../src/version.js';
 const env = (extra: Record<string, string> = {}): NodeJS.ProcessEnv =>
   ({ ROOTKEY_API_KEY: 'rk_live_abc', ...extra }) as NodeJS.ProcessEnv;
 
+const PAT = `rk_pat_${'0123456789abcdef'.repeat(4)}`;
+const patEnv = (extra: Record<string, string> = {}): NodeJS.ProcessEnv =>
+  ({ ROOTKEY_TOKEN: PAT, ...extra }) as NodeJS.ProcessEnv;
+
 describe('loadConfig', () => {
   it('fails fast and names the variable when the API key is missing', () => {
     expect(() => loadConfig({} as NodeJS.ProcessEnv)).toThrow(ConfigError);
@@ -74,7 +78,7 @@ describe('loadConfig', () => {
     });
 
     it('carries exactly one warning that says the value is obsolete and can be removed', () => {
-      const config = loadConfig(env({ ROOTKEY_ENV: 'development', ROOTKEY_API_URL: URL_ }));
+      const config = loadConfig(patEnv({ ROOTKEY_ENV: 'development', ROOTKEY_API_URL: URL_ }));
       expect(config.warnings).toHaveLength(1);
       const [warning] = config.warnings;
       expect(warning).toContain('ROOTKEY_ENV');
@@ -98,10 +102,10 @@ describe('loadConfig', () => {
     });
 
     it('has no warnings when ROOTKEY_ENV is production, empty or unset', () => {
-      expect(loadConfig(env({ ROOTKEY_ENV: 'production', ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
-      expect(loadConfig(env({ ROOTKEY_ENV: '', ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
-      expect(loadConfig(env({ ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
-      expect(loadConfig(env()).warnings).toEqual([]);
+      expect(loadConfig(patEnv({ ROOTKEY_ENV: 'production', ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
+      expect(loadConfig(patEnv({ ROOTKEY_ENV: '', ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
+      expect(loadConfig(patEnv({ ROOTKEY_API_URL: URL_ })).warnings).toEqual([]);
+      expect(loadConfig(patEnv()).warnings).toEqual([]);
     });
 
     it('still validates the URL: plain http off loopback is refused', () => {
@@ -227,10 +231,198 @@ describe('keyMode', () => {
   });
 });
 
+describe('config errors do not echo what they reject', () => {
+  const secretish = 'hunter2-pasted-in-the-wrong-variable';
+
+  it.each(['ROOTKEY_TEST_MODE', 'ROOTKEY_READ_ONLY', 'ROOTKEY_API_URL', 'ROOTKEY_ENV', 'ROOTKEY_LOG_LEVEL', 'ROOTKEY_TIMEOUT_MS'])('%s', (variable) => {
+    let error: unknown;
+    try {
+      loadConfig(patEnv({ [variable]: secretish }));
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).message).toContain(variable);
+    expect((error as ConfigError).message).not.toContain(secretish);
+  });
+});
+
+describe('plain http', () => {
+  it.each(['localhost', '127.0.0.1', '127.8.9.10', '[::1]'])('is allowed for %s', (host) => {
+    expect(normalizeBaseUrl(`http://${host}:3333/api-v1`)).toContain(host);
+  });
+
+  // Loopback only on resolvers that implement RFC 6761; a credential must not depend on which one the machine has.
+  it.each(['app.localhost', 'localhost.example.com', '128.0.0.1', '10.0.0.1', '127.0.0.1.example.com'])('is refused for %s', (host) => {
+    expect(() => normalizeBaseUrl(`http://${host}/api-v1`)).toThrow(/unencrypted/);
+  });
+});
+
+describe('credentials', () => {
+  it('accepts a personal access token and sends nothing to stderr about it', () => {
+    const config = loadConfig(patEnv());
+    expect(config.credential).toEqual({ kind: 'pat', token: PAT });
+    expect(config.warnings).toEqual([]);
+    expect(config.organization).toBeUndefined();
+    expect(config.testMode).toBeUndefined();
+  });
+
+  it('trims the token', () => {
+    expect(loadConfig(patEnv({ ROOTKEY_TOKEN: `  ${PAT}\n` })).credential).toEqual({ kind: 'pat', token: PAT });
+  });
+
+  // 0.1.x configuration must keep working: the key is accepted, with one actionable line.
+  it.each(['rk_live_abc', 'rk_test_abc', '3f2b8c1e-9d4a-4e7b-8a61-5c0d2e7f9a10'])(
+    'still accepts the organization API key %s, with exactly one deprecation warning',
+    (key) => {
+      const config = loadConfig({ ROOTKEY_API_KEY: key } as NodeJS.ProcessEnv);
+      expect(config.credential).toEqual({ kind: 'api_key', apiKey: key });
+      expect(config.warnings).toHaveLength(1);
+      const [warning] = config.warnings;
+      expect(warning).toContain('org API keys are deprecated, removed in 0.3.0; use a personal access token');
+      expect(warning).toContain('ROOTKEY_TOKEN');
+      expect(warning).not.toContain('\n');
+      expect(warning).not.toContain(key);
+    },
+  );
+
+  it('refuses both credentials at once, naming both variables', () => {
+    let error: unknown;
+    try {
+      loadConfig(env({ ROOTKEY_TOKEN: PAT }));
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    const message = (error as ConfigError).message;
+    expect(message).toContain('ROOTKEY_TOKEN');
+    expect(message).toContain('ROOTKEY_API_KEY');
+    expect(message).not.toContain(PAT);
+  });
+
+  it('says where to create a personal access token when no credential is set', () => {
+    let error: unknown;
+    try {
+      loadConfig({} as NodeJS.ProcessEnv);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    const message = (error as ConfigError).message;
+    expect(message).toContain('ROOTKEY_TOKEN');
+    expect(message).toContain('Settings -> Personal access tokens');
+    expect(message).toContain('ROOTKEY_API_KEY');
+  });
+
+  it('treats a blank ROOTKEY_TOKEN as unset, so a stale empty variable does not break an API key setup', () => {
+    const config = loadConfig(env({ ROOTKEY_TOKEN: '   ' }));
+    expect(config.credential.kind).toBe('api_key');
+  });
+
+  describe.each([
+    ['a different prefix', `rk_live_${'0123456789abcdef'.repeat(4)}`],
+    ['the agent token prefix', `rk_agt_${'0123456789abcdef'.repeat(4)}`],
+    ['too short', 'rk_pat_0123456789abcdef'],
+    ['too long', `rk_pat_${'0123456789abcdef'.repeat(4)}0`],
+    ['upper-case hex', `rk_pat_${'0123456789ABCDEF'.repeat(4)}`],
+    ['non-hex characters', `rk_pat_${'g'.repeat(64)}`],
+    ['a prefix and one stray character', 'rk_pat_z'],
+    ['a plain UUID', '3f2b8c1e-9d4a-4e7b-8a61-5c0d2e7f9a10'],
+  ])('a malformed ROOTKEY_TOKEN (%s)', (_label, bad) => {
+    it('is refused without echoing the value', () => {
+      let error: unknown;
+      try {
+        loadConfig({ ROOTKEY_TOKEN: bad } as NodeJS.ProcessEnv);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ConfigError);
+      const message = (error as ConfigError).message;
+      expect(message).toContain('ROOTKEY_TOKEN');
+      expect(message).toContain('rk_pat_');
+      expect(message).not.toContain(bad);
+    });
+  });
+
+  it('points a token pasted into ROOTKEY_API_KEY at ROOTKEY_TOKEN, without echoing it', () => {
+    let error: unknown;
+    try {
+      loadConfig({ ROOTKEY_API_KEY: PAT } as NodeJS.ProcessEnv);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).message).toContain('ROOTKEY_TOKEN');
+    expect((error as ConfigError).message).not.toContain(PAT);
+  });
+});
+
+describe('ROOTKEY_ORGANIZATION', () => {
+  it('becomes the default organization of a personal access token, trimmed', () => {
+    expect(loadConfig(patEnv({ ROOTKEY_ORGANIZATION: '  org-123  ' })).organization).toBe('org-123');
+    expect(loadConfig(patEnv({ ROOTKEY_ORGANIZATION: '   ' })).organization).toBeUndefined();
+  });
+
+  // The value ends up in a request header.
+  it.each(['org 1', 'org/1', 'org\r\nx-injected: 1', 'a'.repeat(129), 'org;1'])('rejects %j', (value) => {
+    expect(() => loadConfig(patEnv({ ROOTKEY_ORGANIZATION: value }))).toThrow(ConfigError);
+  });
+
+  it('is ignored, with a warning, next to an organization API key', () => {
+    const config = loadConfig(env({ ROOTKEY_ORGANIZATION: 'org-123' }));
+    expect(config.organization).toBeUndefined();
+    expect(config.warnings.filter((w) => w.includes('ROOTKEY_ORGANIZATION'))).toHaveLength(1);
+  });
+
+  // A 0.1.x setup may export the variable for another tool with any value: it must still start.
+  it.each(['My Company', 'a/b', 'x'.repeat(300), 'org;1'])('never stops an organization API key from starting, whatever it holds (%j)', (value) => {
+    const config = loadConfig(env({ ROOTKEY_ORGANIZATION: value }));
+    expect(config.credential.kind).toBe('api_key');
+    expect(config.organization).toBeUndefined();
+    expect(config.warnings.filter((w) => w.includes('ROOTKEY_ORGANIZATION'))).toHaveLength(1);
+    expect(config.warnings.join('\n')).not.toContain(value);
+  });
+});
+
+describe('ROOTKEY_TEST_MODE', () => {
+  it('is undefined when unset, so the request carries no namespace header and the API answers live', () => {
+    expect(loadConfig(patEnv()).testMode).toBeUndefined();
+    expect(loadConfig(patEnv({ ROOTKEY_TEST_MODE: '' })).testMode).toBeUndefined();
+  });
+
+  it.each([
+    ['true', true],
+    ['TRUE', true],
+    ['1', true],
+    ['false', false],
+    ['off', false],
+    ['0', false],
+  ])('parses %j as %s', (raw, expected) => {
+    expect(loadConfig(patEnv({ ROOTKEY_TEST_MODE: raw })).testMode).toBe(expected);
+  });
+
+  it('rejects a value that is not a boolean', () => {
+    expect(() => loadConfig(patEnv({ ROOTKEY_TEST_MODE: 'sometimes' }))).toThrow(ConfigError);
+  });
+
+  it('is ignored, with a warning, next to an organization API key: the key decides', () => {
+    const config = loadConfig(env({ ROOTKEY_TEST_MODE: 'true' }));
+    expect(config.testMode).toBeUndefined();
+    expect(config.warnings.filter((w) => w.includes('ROOTKEY_TEST_MODE'))).toHaveLength(1);
+  });
+
+  it.each(['staging', 'maybe', '2'])('never stops an organization API key from starting, whatever it holds (%j)', (value) => {
+    const config = loadConfig(env({ ROOTKEY_TEST_MODE: value }));
+    expect(config.credential.kind).toBe('api_key');
+    expect(config.testMode).toBeUndefined();
+    expect(config.warnings.filter((w) => w.includes('ROOTKEY_TEST_MODE'))).toHaveLength(1);
+  });
+});
+
 describe('version', () => {
   it('matches the version in package.json', () => {
     const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string };
     expect(SERVER_VERSION).toBe(pkg.version);
-    expect(SERVER_VERSION).toBe('0.1.1');
+    expect(SERVER_VERSION).toBe('0.2.0');
   });
 });

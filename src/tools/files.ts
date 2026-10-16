@@ -352,7 +352,7 @@ export const fileTools: ToolDefinition[] = [
     name: 'rootkey_get_file_history',
     title: 'Get file activity history',
     description:
-      'Read the activity log for a file: who did what and when, including which API key acted. This is the ' +
+      'Read the activity log for a file: who did what and when, including which credential acted. This is the ' +
       'audit trail for compliance evidence.',
     readOnly: true,
     inputSchema: {
@@ -394,6 +394,7 @@ export const fileTools: ToolDefinition[] = [
 
   {
     name: 'rootkey_generate_file_audit_report',
+    blockedForAgents: true,
     title: 'Generate a compliance audit report',
     description:
       'Queue a NIS2 or DORA compliance report for a file. The API accepts the job and returns a report id; ' +

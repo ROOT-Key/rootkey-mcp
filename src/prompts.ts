@@ -19,6 +19,11 @@ interface PromptDefinition {
   argsSchema: z.ZodRawShape;
   /** Registered in read-only mode. */
   readOnly?: boolean;
+  /**
+   * Built on tools the API refuses to every delegated credential, so a personal access token is not offered the
+   * workflow. Remove the flag together with the tools' own, the day the API stops refusing them.
+   */
+  blockedForAgents?: boolean;
   build: (args: Record<string, string | undefined>) => string;
 }
 
@@ -61,7 +66,7 @@ const promptDefinitions: PromptDefinition[] = [
         '',
         'Collect, in this order:',
         '1. rootkey_get_file - the hashes, the transaction hash, the contract address and the expiration.',
-        '2. rootkey_get_file_history - who touched it, when, and through which API key.',
+        '2. rootkey_get_file_history - who touched it, when, and through which credential.',
         '3. rootkey_get_file_validations - every integrity check performed against it.',
         '4. rootkey_list_file_versions - the version chain, so a reader can see what changed and when.',
         '',
@@ -97,6 +102,7 @@ const promptDefinitions: PromptDefinition[] = [
 
   {
     name: 'backup_workspace',
+    blockedForAgents: true,
     title: 'Create and download a recovery point',
     description: 'Build an encrypted backup archive, wait for it, and download it.',
     argsSchema: {
@@ -127,6 +133,7 @@ export function registerPrompts(server: McpServer, config: Config): string[] {
 
   for (const definition of promptDefinitions) {
     if (config.readOnly && definition.readOnly !== true) continue;
+    if (config.credential.kind === 'pat' && definition.blockedForAgents === true) continue;
 
     server.registerPrompt(
       definition.name,

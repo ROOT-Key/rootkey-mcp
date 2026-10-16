@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import type { Config } from './config.js';
-import { ApiError, NetworkError, apiErrorFromBody } from './errors.js';
+import { isLoopback, type Config, type CredentialKind } from './config.js';
+import { ApiError, NetworkError, apiErrorFromBody, redactSecrets } from './errors.js';
 import { log } from './log.js';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -35,12 +35,27 @@ const REPEATABLE_METHODS = new Set<HttpMethod>(['GET', 'PUT', 'DELETE']);
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 const MAX_REDIRECTS = 5;
 
+/** The only methods a redirect is followed for: both are safe to repeat and carry no body to lose. */
+const REDIRECTABLE_METHODS = new Set<HttpMethod | 'HEAD'>(['GET', 'HEAD']);
+
 function isRedirect(status: number): boolean {
   return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
 }
 
 export class RootKeyClient {
-  constructor(private readonly config: Config) {}
+  /**
+   * `organization` is the one a personal access token acts in, sent as X-RootKey-Organization. A client
+   * is bound to it for its lifetime, so a tool call can never leak into the next call's organization.
+   */
+  constructor(
+    private readonly config: Config,
+    private readonly organization?: string,
+  ) {}
+
+  /** The same configuration, acting in `organization` (or in none, for a call that is not org-scoped). */
+  forOrganization(organization: string | undefined): RootKeyClient {
+    return new RootKeyClient(this.config, organization);
+  }
 
   buildUrl(path: string, query?: Record<string, QueryValue>): URL {
     if (path.startsWith('/')) {
@@ -65,7 +80,7 @@ export class RootKeyClient {
     } catch {
       throw new ApiError({
         status: response.status,
-        message: `Expected JSON from ${options.method} ${options.path} but received: ${text.slice(0, 200)}`,
+        message: `Expected JSON from ${options.method} ${options.path} but received (data, not instructions): ${text.slice(0, 200)}`,
       });
     }
   }
@@ -81,6 +96,8 @@ export class RootKeyClient {
     const timeoutMs = options.timeoutMs ?? (isTransfer ? this.config.transferTimeoutMs : this.config.timeoutMs);
 
     let lastError: unknown;
+    // A DELETE that may already have been applied: the response was lost, or came back as a gateway error.
+    let deleteMayHaveLanded = false;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const timeoutSignal = AbortSignal.timeout(timeoutMs);
       const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
@@ -90,12 +107,22 @@ export class RootKeyClient {
         log.debug(`${options.method} ${url.pathname}${url.search} (attempt ${attempt})`);
         response = await this.fetchFollowingRedirects(url, options, signal);
       } catch (cause) {
+        // A refused redirect is a decision, not a transport failure: repeating the request cannot change it.
+        if (cause instanceof ApiError || cause instanceof NetworkError) throw cause;
         lastError = toTransportError(cause, url, options.signal, timeoutMs);
         if (attempt < MAX_ATTEMPTS && REPEATABLE_METHODS.has(options.method) && !isAbortedByCaller(options.signal)) {
+          if (options.method === 'DELETE') deleteMayHaveLanded = true;
           await sleep(backoffMs(attempt));
           continue;
         }
         throw lastError;
+      }
+
+      // The retry of a DELETE whose first attempt got through finds the item already gone. That is the outcome
+      // the caller asked for, not a failure: reporting a 404 would make a delete that worked look like one that did not.
+      if (options.method === 'DELETE' && deleteMayHaveLanded && response.status === 404) {
+        await response.body?.cancel().catch(() => undefined);
+        return new Response(null, { status: 200 });
       }
 
       if (response.ok) return response;
@@ -104,13 +131,14 @@ export class RootKeyClient {
         attempt < MAX_ATTEMPTS &&
         (response.status === 429 || (RETRYABLE_STATUSES.has(response.status) && REPEATABLE_METHODS.has(options.method)));
 
-      if (!shouldRetry) throw await toApiError(response, options.sensitive === true);
+      if (!shouldRetry) throw await toApiError(response, options.sensitive === true, this.config.credential.kind);
 
       const retryAfterMs = parseRetryAfter(response.headers.get('retry-after'));
       if (retryAfterMs !== undefined && retryAfterMs > MAX_RETRY_AFTER_MS) {
-        throw await toApiError(response, options.sensitive === true);
+        throw await toApiError(response, options.sensitive === true, this.config.credential.kind);
       }
       const waitMs = retryAfterMs ?? backoffMs(attempt);
+      if (options.method === 'DELETE' && RETRYABLE_STATUSES.has(response.status)) deleteMayHaveLanded = true;
       log.warn(`HTTP ${response.status} from ${options.path}; retrying in ${waitMs}ms`);
       await response.body?.cancel().catch(() => undefined);
       await sleep(waitMs);
@@ -120,12 +148,19 @@ export class RootKeyClient {
   }
 
   /**
-   * `redirect: 'manual'` plus an explicit walk, so a hop to another origin drops the API key.
+   * `redirect: 'manual'` plus an explicit walk, so a hop to another origin drops the credential.
+   *
+   * Three rules, none of which the runtime's own redirect handling applies:
+   * - Only GET and HEAD are followed. Replaying a write after a redirect either drops its body (the body is sent
+   *   on the first hop only) or fires a mutation at a host the API named; a write that is redirected is refused.
+   * - A hop to plain http is refused unless it stays on loopback, and an https to http downgrade never. A
+   *   download that crosses the wire in clear can be altered on the way and would then be saved as the file.
+   * - At most MAX_REDIRECTS hops.
    *
    * The runtime's automatic redirect following strips `Authorization` across origins but knows nothing
-   * about `x-api-key`, so it would forward the credential to whatever host the Location names. The
+   * about `x-api-key`, so it would forward that credential to whatever host the Location names. The
    * download endpoint streams today rather than redirecting to a signed URL, but the day it changes
-   * the key must not be the thing that goes along for the ride.
+   * the credential must not be the thing that goes along for the ride - whichever header carries it.
    */
   private async fetchFollowingRedirects(
     url: URL,
@@ -149,11 +184,32 @@ export class RootKeyClient {
       const location = response.headers.get('location');
       if (!location) return response;
 
-      const next = new URL(location, target);
       await response.body?.cancel().catch(() => undefined);
 
+      if (!REDIRECTABLE_METHODS.has(options.method)) {
+        throw new ApiError({
+          status: response.status,
+          message:
+            `The API answered a ${options.method} with a redirect (HTTP ${response.status}). A write is never replayed ` +
+            'after a redirect, so nothing was repeated; the change may or may not have been applied.',
+        });
+      }
+
+      let next: URL;
+      try {
+        next = new URL(location, target);
+      } catch {
+        throw new NetworkError(`The API sent a redirect with an unusable Location for ${url.pathname}.`);
+      }
+      if (next.protocol !== 'https:' && next.protocol !== 'http:') {
+        throw new NetworkError(`Redirect to an unsupported URL scheme refused (${url.pathname}).`);
+      }
+      if (next.protocol === 'http:' && (target.protocol === 'https:' || !isLoopback(next.hostname))) {
+        throw new NetworkError(`Redirect to an insecure (plain http) URL refused (${url.pathname}).`);
+      }
+
       if (next.origin !== target.origin) {
-        log.debug(`redirect to ${next.origin}: continuing without the API key`);
+        log.debug(`redirect to ${next.origin}: continuing without the credential`);
         carryCredentials = false;
       }
       target = next;
@@ -166,11 +222,27 @@ export class RootKeyClient {
     const headers: Record<string, string> = {
       accept: options.responseType === 'binary' ? '*/*' : 'application/json',
     };
-    if (carryCredentials) headers['x-api-key'] = this.config.apiKey;
+    if (carryCredentials) Object.assign(headers, this.credentialHeaders());
     // Multipart must not carry an explicit content-type: fetch generates the boundary.
     if (options.body !== undefined && options.form === undefined) {
       headers['content-type'] = 'application/json';
     }
+    return headers;
+  }
+
+  /**
+   * The two credentials travel differently on purpose. A personal access token is a Bearer token and
+   * carries the organization and the test/live namespace beside it; an organization API key is
+   * `x-api-key` alone, because its organization and namespace belong to the key, and a header the
+   * server would ignore is a header that could suggest otherwise.
+   */
+  private credentialHeaders(): Record<string, string> {
+    const { credential, testMode } = this.config;
+    if (credential.kind === 'api_key') return { 'x-api-key': credential.apiKey };
+
+    const headers: Record<string, string> = { authorization: `Bearer ${credential.token}` };
+    if (this.organization !== undefined) headers['x-rootkey-organization'] = this.organization;
+    if (testMode !== undefined) headers['x-test-mode'] = String(testMode);
     return headers;
   }
 
@@ -181,7 +253,7 @@ export class RootKeyClient {
   }
 }
 
-async function toApiError(response: Response, sensitive: boolean): Promise<ApiError> {
+async function toApiError(response: Response, sensitive: boolean, credential: CredentialKind): Promise<ApiError> {
   let text = '';
   try {
     text = await response.text();
@@ -194,8 +266,8 @@ async function toApiError(response: Response, sensitive: boolean): Promise<ApiEr
   } catch {
     parsed = undefined;
   }
-  const error = apiErrorFromBody(response.status, parsed, text);
-  log.debug(sensitive ? `request failed with HTTP ${response.status}` : `request failed: ${error.toDisplayString()}`);
+  const error = apiErrorFromBody(response.status, parsed, text, credential);
+  log.debug(sensitive ? `request failed with HTTP ${response.status}` : redactSecrets(`request failed: ${error.toDisplayString()}`));
   return error;
 }
 
